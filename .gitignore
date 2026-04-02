@@ -81,6 +81,3 @@ build/
 # OS
 .DS_Store
 Thumbs.db
-
-# Cloudflare
-.cloudflared/

@@ -10,6 +10,8 @@ services:
       - postgres_data:/var/lib/postgresql/data:Z
     ports:
       - "35432:5432"
+    networks:
+      - pulsedash-network
 
   redis:
     image: docker.io/library/redis:7-alpine
@@ -18,6 +20,8 @@ services:
       - redis_data:/data:Z
     ports:
       - "36379:6379"
+    networks:
+      - pulsedash-network
 
   minio:
     image: quay.io/minio/minio
@@ -31,6 +35,8 @@ services:
       - "39000:9000"
       - "39001:9001" 
     command: server /data --console-address ":9001"
+    networks:
+      - pulsedash-network
 
   api:
     build:
@@ -49,6 +55,8 @@ services:
       - ./alembic.ini:/app/alembic.ini:Z
       - ./src/api/db/migrations:/app/src/api/db/migrations:Z
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 9050 --reload
+    networks:
+      - pulsedash-network
 
   celery:
     build:
@@ -63,8 +71,24 @@ services:
     volumes:
       - ./src:/app/src:Z
     command: celery -A src.api.core.celery_app worker --loglevel=info --concurrency=4
+    networks:
+      - pulsedash-network
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    env_file: .env
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    depends_on:
+      - api
+    networks:
+      - pulsedash-network
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+
+networks:
+  pulsedash-network:
+    driver: bridge
