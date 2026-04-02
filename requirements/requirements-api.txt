@@ -1,0 +1,17 @@
+fastapi[standard]==0.113.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.7
+pydantic==2.10.6
+pydantic-settings==2.6.1
+requests==2.32.5
+loguru==0.7.2
+SQLAlchemy==2.0.35
+psycopg2-binary==2.9.10
+alembic==1.13.1
+librosa==0.11.0
+numpy==2.2.6
+scipy==1.15.3
+soundfile==0.13.1
+minio==7.2.12
+celery==5.4.0
+redis==5.0.1
