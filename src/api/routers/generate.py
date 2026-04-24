@@ -3,10 +3,12 @@ import json
 import tempfile
 import os
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from src.api.core.config import get_settings
+from src.api.core.limiter import limiter
 from src.api.db.session import get_session
 from src.api.db.repositories import job_repo
 from src.api.db.repositories.job_repo import JobState
@@ -16,10 +18,12 @@ from src.api.services.storage import StorageService
 from loguru import logger
 
 router = APIRouter()
+settings = get_settings()
 
 
 @router.post("/generate", response_model=GenerateAccepted, status_code=202)
-async def generate_level(body: GenerateRequest, db: Session = Depends(get_session)):
+@limiter.limit("10/minute")
+async def generate_level(request: Request, body: GenerateRequest, db: Session = Depends(get_session)):
     job_id = str(uuid.uuid4())
     job_repo.create_job(db, job_id=job_id)
     generate_level_task.delay(job_id, body.track_id)

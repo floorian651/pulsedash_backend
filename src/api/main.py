@@ -19,10 +19,14 @@
 import asyncio
 import json
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from src.api.core.config import get_settings
+from src.api.core.limiter import limiter
 from src.api.db.session import init_engine, get_session
 from src.api.db.repositories import job_repo
 from src.api.routers import generate, jobs, music, playlists, tracks
@@ -35,6 +39,12 @@ ws_manager = WebSocketManager()
 
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
+
+    # ---------------------------------------------------------
+    # Rate limiting
+    # ---------------------------------------------------------
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # ---------------------------------------------------------
     # CORS
