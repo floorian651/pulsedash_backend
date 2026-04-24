@@ -24,8 +24,15 @@ def init_engine(database_url: str):
 
 
 def get_session() -> Generator[Session, None, None]:
+    global engine, SessionLocal
+    
     if SessionLocal is None:
-        raise RuntimeError("Database engine not initialized. Call init_engine() first.")
+        import os
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise RuntimeError("DATABASE_URL environment variable not set and database engine not initialized.")
+        init_engine(database_url)
+    
     db = SessionLocal()
     try:
         yield db

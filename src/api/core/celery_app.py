@@ -1,6 +1,7 @@
 import os
 
 from celery import Celery
+from celery.signals import worker_process_init
 
 
 def _build_broker_url() -> str:
@@ -32,3 +33,15 @@ app.conf.update(
     broker_connection_retry_on_startup=True,
     include=["src.api.services.tasks"],
 )
+
+
+def init_worker_db(**kwargs):
+    """Initialize database engine when worker process starts."""
+    from src.api.core.config import get_settings
+    from src.api.db.session import init_engine
+
+    settings = get_settings()
+    init_engine(settings.DATABASE_URL)
+
+
+worker_process_init.connect(init_worker_db, sender=app)

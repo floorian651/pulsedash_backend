@@ -83,6 +83,8 @@ services:
       - api
     networks:
       - pulsedash-network
+    environment:
+      - CLOUDFLARED_NO_QUIC=true
 
 volumes:
   postgres_data:
