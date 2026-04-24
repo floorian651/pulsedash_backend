@@ -93,24 +93,41 @@ async def create_music(music_data: MusicCreate, db: Session = Depends(get_sessio
     return music
 
 
+ALLOWED_CONTENT_TYPES = {"audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/flac", "audio/x-flac"}
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 Mo
+
+
 @router.post("/upload/{title}")
 async def upload_music_file(
     title: str, file: UploadFile = File(...), db: Session = Depends(get_session)
 ):
-    """
-    Upload a music file to MinIO and create/update a music entry.
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Format non supporté : {file.content_type}. Formats acceptés : mp3, wav, ogg, flac.",
+        )
 
-    The file will be stored at: music_files/{title}/{filename}
-    """
     try:
         safe_title = _sanitize_path_component(title)
         safe_filename = _sanitize_path_component(file.filename or "upload.mp3")
 
         music = music_repo.get_music(db, title)
 
-        # Save uploaded file temporarily
+        # Lecture par chunks pour limiter la RAM et vérifier la taille
+        chunk_size = 64 * 1024  # 64 Ko
+        contents = b""
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            contents += chunk
+            if len(contents) > MAX_UPLOAD_SIZE:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Fichier trop volumineux. Limite : {MAX_UPLOAD_SIZE // 1024 // 1024} Mo.",
+                )
+
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-            contents = await file.read()
             tmp.write(contents)
             temp_path = tmp.name
 
