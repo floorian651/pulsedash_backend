@@ -88,3 +88,78 @@ def test_upload_null_byte_in_filename(client):
     assert response.status_code == 200
     object_name = call[0][0]
     assert "\x00" not in object_name
+
+
+# ---------------------------------------------------------------------------
+# Validation upload : content-type et taille
+# ---------------------------------------------------------------------------
+
+def _upload_with_type(client, content_type: str, content: bytes = b"fake audio"):
+    with patch("src.api.routers.music.StorageService"):
+        return client.post(
+            "/api/v1/music/upload/test_title",
+            files={"file": ("track.mp3", io.BytesIO(content), content_type)},
+        )
+
+
+def test_upload_valid_content_types(client):
+    for ct in ["audio/mpeg", "audio/wav", "audio/ogg", "audio/flac"]:
+        with patch("src.api.routers.music.StorageService") as MockStorage:
+            instance = MagicMock()
+            instance.get_download_url.return_value = "http://minio/test"
+            MockStorage.return_value = instance
+            response = client.post(
+                "/api/v1/music/upload/test_title",
+                files={"file": ("track.mp3", io.BytesIO(b"fake"), ct)},
+            )
+        assert response.status_code == 200, f"Attendu 200 pour {ct}, reçu {response.status_code}"
+
+
+def test_upload_invalid_content_type_returns_415(client):
+    response = _upload_with_type(client, "application/pdf")
+    assert response.status_code == 415
+
+
+def test_upload_executable_content_type_returns_415(client):
+    response = _upload_with_type(client, "application/octet-stream")
+    assert response.status_code == 415
+
+
+def test_upload_file_too_large_returns_413(client):
+    from src.api.routers.music import MAX_UPLOAD_SIZE
+    oversized = b"x" * (MAX_UPLOAD_SIZE + 1)
+    with patch("src.api.routers.music.StorageService"):
+        response = client.post(
+            "/api/v1/music/upload/test_title",
+            files={"file": ("big.mp3", io.BytesIO(oversized), "audio/mpeg")},
+        )
+    assert response.status_code == 413
+
+
+def test_upload_at_size_limit_is_accepted(client):
+    from src.api.routers.music import MAX_UPLOAD_SIZE
+    exact_size = b"x" * MAX_UPLOAD_SIZE
+    with patch("src.api.routers.music.StorageService") as MockStorage:
+        instance = MagicMock()
+        instance.get_download_url.return_value = "http://minio/test"
+        MockStorage.return_value = instance
+        response = client.post(
+            "/api/v1/music/upload/test_title",
+            files={"file": ("exact.mp3", io.BytesIO(exact_size), "audio/mpeg")},
+        )
+    assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+
+def test_rate_limit_generate(client, mock_celery):
+    """Au-delà de 10 requêtes/min depuis la même IP, l'API doit retourner 429."""
+    responses = [
+        client.post("/api/v1/generate", json={"track_id": str(i)})
+        for i in range(12)
+    ]
+    status_codes = [r.status_code for r in responses]
+    assert 429 in status_codes, "Le rate limiting devrait retourner 429 après 10 requêtes"
+    assert responses[0].status_code == 202, "La première requête doit passer"

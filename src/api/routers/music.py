@@ -171,6 +171,8 @@ async def upload_music_file(
             "bucket_name": "musics",
         }
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
