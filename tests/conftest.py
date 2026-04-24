@@ -11,6 +11,7 @@ Ordre critique des opérations au chargement du module :
 
 import os
 
+os.environ["DEBUG"] = "false"  # forcer False même si le .env dit true
 os.environ.setdefault("POSTGRES_HOST", "testhost")
 os.environ.setdefault("POSTGRES_USER", "test")
 os.environ.setdefault("POSTGRES_PASSWORD", "test")
@@ -82,6 +83,19 @@ def client(db):
 
     app.dependency_overrides[get_session] = _override
     with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client_no_raise(db):
+    """Client qui retourne les réponses 5xx au lieu de lever l'exception.
+    Nécessaire pour tester le handler d'erreur global."""
+    def _override():
+        yield db
+
+    app.dependency_overrides[get_session] = _override
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 

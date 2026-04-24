@@ -47,6 +47,18 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # ---------------------------------------------------------
+    # Erreurs non gérées : masquer les détails internes en prod
+    # ---------------------------------------------------------
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):
+        if settings.DEBUG:
+            raise exc
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
+
+    # ---------------------------------------------------------
     # CORS
     # ---------------------------------------------------------
     app.add_middleware(
