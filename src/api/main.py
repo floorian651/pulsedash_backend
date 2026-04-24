@@ -29,7 +29,7 @@ from src.api.core.config import get_settings
 from src.api.core.limiter import limiter
 from src.api.db.session import init_engine, get_session
 from src.api.db.repositories import job_repo
-from src.api.routers import generate, jobs, music, playlists, tracks
+from src.api.routers import generate, jobs, music, playlists, scores, tracks
 from src.api.services.storage import ensure_buckets_exist
 from src.api.utils.websocket_manager import WebSocketManager
 
@@ -83,6 +83,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(tracks.router, prefix=settings.API_V1_PREFIX, tags=["tracks"])
+
+    app.include_router(scores.router, prefix=settings.API_V1_PREFIX, tags=["scores"])
 
     # ---------------------------------------------------------
     # Healthcheck
