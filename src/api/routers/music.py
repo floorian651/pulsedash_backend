@@ -1,13 +1,29 @@
+import re
+import tempfile
+import os
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from ..services.jamendo import download_track
 from ..services.storage import StorageService
 from ..db.session import get_session
 from ..db.repositories import music_repo
 from ..schemas.music import MusicCreate, MusicUpdate, MusicResponse
-import tempfile
-import os
-from pathlib import Path
+
+_SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9_\-.]")
+
+
+def _sanitize_path_component(value: str, max_len: int = 128) -> str:
+    """Supprime tout caractère non autorisé et empêche le path traversal."""
+    name = os.path.basename(value)          # élimine les segments ../
+    name = _SAFE_NAME_RE.sub("_", name)     # remplace les caractères spéciaux
+    name = name.strip(".")                  # empêche les noms déguisés en .hidden
+    name = name[:max_len]
+    if not name:
+        raise ValueError("Nom de fichier invalide après sanitisation")
+    return name
 
 router = APIRouter(prefix="/music", tags=["music"])
 
@@ -87,6 +103,9 @@ async def upload_music_file(
     The file will be stored at: music_files/{title}/{filename}
     """
     try:
+        safe_title = _sanitize_path_component(title)
+        safe_filename = _sanitize_path_component(file.filename or "upload.mp3")
+
         music = music_repo.get_music(db, title)
 
         # Save uploaded file temporarily
@@ -97,7 +116,7 @@ async def upload_music_file(
 
         # Upload to MinIO
         storage = StorageService(bucket_type="music")
-        file_object_name = f"music_files/{title}/{file.filename}"
+        file_object_name = f"music_files/{safe_title}/{safe_filename}"
         storage.upload_file(file_object_name, temp_path)
 
         # Get file size
@@ -107,10 +126,9 @@ async def upload_music_file(
         os.unlink(temp_path)
 
         if music:
-            # Update existing music with new file path
-            music_repo.update_music(db, title)  # This just refreshes it
             db.execute(
-                f"UPDATE music SET file_path = '{file_object_name}' WHERE title = '{title}'"
+                text("UPDATE music SET file_path = :path WHERE title = :title"),
+                {"path": file_object_name, "title": title},
             )
             db.commit()
         else:
@@ -136,8 +154,10 @@ async def upload_music_file(
             "bucket_name": "musics",
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Upload failed")
 
 
 @router.put("/{title}", response_model=MusicResponse)
@@ -184,7 +204,8 @@ async def import_jamendo_track(track_id: str):
 
         # 2. Upload to MinIO
         storage = StorageService(bucket_type="music")
-        object_name = f"jamendo_{track_id}.mp3"
+        safe_id = _sanitize_path_component(track_id)
+        object_name = f"jamendo_{safe_id}.mp3"
         storage.upload_file(object_name, temp_path)
 
         # 3. Generate download URL for 24h
