@@ -62,3 +62,14 @@ def set_result_path(db: Session, job_id: str, result_path: str) -> Job:
         db.commit()
         db.refresh(job)
     return job
+
+
+def set_error_message(db: Session, job_id: str, message: str) -> Job:
+    """Enregistre le message d'erreur d'un job échoué"""
+    job = get_job(db, job_id)
+    if job:
+        job.error_message = message
+        job.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(job)
+    return job

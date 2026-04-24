@@ -20,6 +20,7 @@ class Job(Base):
     state = Column(Enum(JobState), default=JobState.PENDING)
     progress = Column(Integer, default=0)
     result_path = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
