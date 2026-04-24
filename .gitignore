@@ -27,10 +27,13 @@ share/python-wheels/
 MANIFEST
 
 # Virtual environments
-.venv
+.venv/
 .env
 .env.local
 .env.*.local
+
+# uv
+.python-version
 
 # IDE
 .vscode/
