@@ -3,7 +3,7 @@ from .User import User
 from .Job import Job
 from .Music import Music
 from .Playlist import Playlist
+from .Score import Score
 from .Track import Track
 
-# On exporte tout pour que "Base.metadata" soit complet
-__all__ = ["Base", "User", "Job", "Music", "Playlist", "Track"]
+__all__ = ["Base", "User", "Job", "Music", "Playlist", "Score", "Track"]

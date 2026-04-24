@@ -1,7 +1,12 @@
+from datetime import datetime, timezone
+from enum import Enum
+
 from sqlalchemy.orm import Session
 from src.api.db.models import Job
-from datetime import datetime
-from enum import Enum
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class JobState(str, Enum):
@@ -18,7 +23,7 @@ def create_job(db: Session, job_id: str, user_id: str = None) -> Job:
         user_id=user_id,
         state=JobState.PENDING,
         progress=0,
-        created_at=datetime.utcnow(),
+        created_at=_now(),
     )
     db.add(job)
     db.commit()
@@ -36,7 +41,7 @@ def update_job_state(db: Session, job_id: str, state: JobState) -> Job:
     job = get_job(db, job_id)
     if job:
         job.state = state
-        job.updated_at = datetime.utcnow()
+        job.updated_at = _now()
         db.commit()
         db.refresh(job)
     return job
@@ -47,7 +52,7 @@ def update_job_progress(db: Session, job_id: str, progress: int) -> Job:
     job = get_job(db, job_id)
     if job:
         job.progress = min(progress, 100)
-        job.updated_at = datetime.utcnow()
+        job.updated_at = _now()
         db.commit()
         db.refresh(job)
     return job
@@ -58,7 +63,7 @@ def set_result_path(db: Session, job_id: str, result_path: str) -> Job:
     job = get_job(db, job_id)
     if job:
         job.result_path = result_path
-        job.updated_at = datetime.utcnow()
+        job.updated_at = _now()
         db.commit()
         db.refresh(job)
     return job
@@ -69,7 +74,7 @@ def set_error_message(db: Session, job_id: str, message: str) -> Job:
     job = get_job(db, job_id)
     if job:
         job.error_message = message
-        job.updated_at = datetime.utcnow()
+        job.updated_at = _now()
         db.commit()
         db.refresh(job)
     return job
