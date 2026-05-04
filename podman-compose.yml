@@ -54,7 +54,7 @@ services:
       - ./src:/app/src:Z
       - ./alembic.ini:/app/alembic.ini:Z
       - ./src/api/db/migrations:/app/src/api/db/migrations:Z
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 9050 --reload
+    command: uv run uvicorn src.api.main:app --host 0.0.0.0 --port 9050 --reload
     networks:
       - pulsedash-network
 
