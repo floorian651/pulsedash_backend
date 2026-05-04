@@ -29,7 +29,7 @@ from src.api.core.config import get_settings
 from src.api.core.limiter import limiter
 from src.api.db.session import init_engine, get_session
 from src.api.db.repositories import job_repo
-from src.api.routers import generate, jobs, music, playlists, scores, tracks
+from src.api.routers import auth, generate, jobs, music, playlists, scores, tracks
 from src.api.services.storage import ensure_buckets_exist
 from src.api.utils.websocket_manager import WebSocketManager
 
@@ -70,6 +70,8 @@ def create_app() -> FastAPI:
     # ---------------------------------------------------------
     # Routers
     # ---------------------------------------------------------
+    app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["auth"])
+
     app.include_router(
         generate.router, prefix=settings.API_V1_PREFIX, tags=["generate"]
     )
