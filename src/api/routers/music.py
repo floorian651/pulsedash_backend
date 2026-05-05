@@ -1,13 +1,11 @@
 import re
 import tempfile
 import os
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from ..dependencies import get_current_user
-from ..services.jamendo import download_track
 from ..services.storage import StorageService
 from ..db.session import get_session
 from ..db.repositories import music_repo
@@ -206,46 +204,3 @@ async def delete_music(title: str, db: Session = Depends(get_session), _=Depends
     if not deleted:
         raise HTTPException(status_code=404, detail="Music not found")
     return {"status": "deleted", "title": title}
-
-
-@router.post("/import-jamendo/{track_id}")
-async def import_jamendo_track(track_id: str, _=Depends(get_current_user)):
-    """
-    Download music from Jamendo and save it to MinIO.
-    Returns a presigned URL to download the file.
-    """
-    try:
-        # 1. Download from Jamendo to a temporary file
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-            temp_path = tmp.name
-
-        download_track(track_id, temp_path)
-        file_size = os.path.getsize(temp_path)
-
-        # 2. Upload to MinIO
-        storage = StorageService(bucket_type="music")
-        safe_id = _sanitize_path_component(track_id)
-        object_name = f"jamendo_{safe_id}.mp3"
-        storage.upload_file(object_name, temp_path)
-
-        # 3. Generate download URL for 24h
-        download_url = storage.get_download_url(object_name, expires_minutes=1440)
-
-        # 4. Clean up temporary file
-        os.unlink(temp_path)
-
-        return {
-            "status": "success",
-            "track_id": track_id,
-            "object_name": object_name,
-            "file_size": file_size,
-            "download_url": download_url,
-        }
-
-    except ValueError as e:
-        # Track not found on Jamendo
-        raise HTTPException(status_code=404, detail=str(e))
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=f"File not found: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
