@@ -1,27 +1,9 @@
-# Le point d’entrée de l’API.
-
-#     crée l’application FastAPI
-
-#     configure CORS
-
-#     initialise la DB
-
-#     monte les routers
-
-#     expose WebSocket /ws/jobs/{job_id}
-
-# C’est le fichier à lancer avec Uvicorn.
-
-# from fastapi import FastAPI, File, UploadFile
-
-# from src.pipeline.main import main as run_pipeline
-
 import asyncio
 import json
 
-from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+import redis.asyncio as redis_asyncio
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -41,15 +23,9 @@ ws_manager = WebSocketManager()
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 
-    # ---------------------------------------------------------
-    # Rate limiting
-    # ---------------------------------------------------------
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    # ---------------------------------------------------------
-    # CORS
-    # ---------------------------------------------------------
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",")],
@@ -58,53 +34,26 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ---------------------------------------------------------
-    # Database init
-    # ---------------------------------------------------------
     init_engine(settings.DATABASE_URL)
-
-    # ---------------------------------------------------------
-    # MinIO setup
-    # ---------------------------------------------------------
     ensure_buckets_exist()
 
-    # ---------------------------------------------------------
-    # Routers
-    # ---------------------------------------------------------
     app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["auth"])
-
-    app.include_router(
-        generate.router, prefix=settings.API_V1_PREFIX, tags=["generate"]
-    )
-
+    app.include_router(generate.router, prefix=settings.API_V1_PREFIX, tags=["generate"])
     app.include_router(jobs.router, prefix=settings.API_V1_PREFIX, tags=["jobs"])
-
     app.include_router(music.router, prefix=settings.API_V1_PREFIX, tags=["music"])
-
-    app.include_router(
-        playlists.router, prefix=settings.API_V1_PREFIX, tags=["playlists"]
-    )
-
+    app.include_router(playlists.router, prefix=settings.API_V1_PREFIX, tags=["playlists"])
     app.include_router(tracks.router, prefix=settings.API_V1_PREFIX, tags=["tracks"])
-
     app.include_router(scores.router, prefix=settings.API_V1_PREFIX, tags=["scores"])
-
     app.include_router(game_sessions.router, prefix=settings.API_V1_PREFIX, tags=["game-sessions"])
-
     app.include_router(profile.router, prefix=settings.API_V1_PREFIX, tags=["profile"])
 
-    # ---------------------------------------------------------
-    # Healthcheck
-    # ---------------------------------------------------------
     @app.get("/")
     async def healthcheck():
         return {"status": "ok", "app": settings.APP_NAME}
 
-    # ---------------------------------------------------------
-    # WebSocket: suivi des jobs en temps réel
-    # ---------------------------------------------------------
     @app.websocket("/ws/jobs/{job_id}")
     async def job_ws(websocket: WebSocket, job_id: str, token: str = Query(...)):
+        # ── Auth ─────────────────────────────────────────────────────────────
         db = next(get_session())
         try:
             user_id = decode_token(token)
@@ -118,41 +67,66 @@ def create_app() -> FastAPI:
             await websocket.close(code=1008)
             db.close()
             return
+        db.close()
 
         await ws_manager.connect(job_id, websocket)
+
+        redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
+        r = redis_asyncio.from_url(redis_url)
+        pubsub = r.pubsub()
+
         try:
-            last_state = None
-            last_progress = -1
-            while True:
-                job = job_repo.get_job(db, job_id)
-                if not job:
-                    await websocket.send_text(json.dumps({"error": "job not found"}))
-                    break
-                if str(job.user_id) != user_id:
-                    await websocket.close(code=1008)
-                    break
+            # Souscrire avant de lire la DB pour ne rater aucun publish
+            await pubsub.subscribe(f"job:{job_id}")
 
-                state = job.state.value if hasattr(job.state, "value") else job.state
-                progress = job.progress or 0
+            db = next(get_session())
+            job = job_repo.get_job(db, job_id)
+            db.close()
 
-                if state != last_state or progress != last_progress:
-                    payload: dict = {"job_id": job_id, "state": state, "progress": progress}
-                    error_msg = getattr(job, "error_message", None)
-                    if error_msg:
-                        payload["error"] = error_msg
-                    await websocket.send_text(json.dumps(payload))
-                    last_state = state
-                    last_progress = progress
+            if not job:
+                await websocket.send_text(json.dumps({"error": "job not found"}))
+                return
+            if str(job.user_id) != user_id:
+                await websocket.close(code=1008)
+                return
 
-                if state in ("completed", "failed"):
-                    break
+            state = job.state.value if hasattr(job.state, "value") else job.state
+            progress = job.progress or 0
+            payload: dict = {"job_id": job_id, "state": state, "progress": progress}
+            if getattr(job, "error_message", None):
+                payload["error"] = job.error_message
+            await websocket.send_text(json.dumps(payload))
 
-                await asyncio.sleep(1)
+            if state in ("completed", "failed"):
+                return
+
+            # Relayer les messages Redis vers le WebSocket
+            async def _forward():
+                async for message in pubsub.listen():
+                    if message["type"] != "message":
+                        continue
+                    data = json.loads(message["data"])
+                    await websocket.send_text(json.dumps(data))
+                    if data.get("state") in ("completed", "failed"):
+                        return
+
+            redis_task = asyncio.create_task(_forward())
+            ws_task = asyncio.create_task(websocket.receive())
+
+            done, pending = await asyncio.wait(
+                {redis_task, ws_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for t in pending:
+                t.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+
         except WebSocketDisconnect:
             pass
         finally:
+            await pubsub.unsubscribe(f"job:{job_id}")
+            await r.aclose()
             ws_manager.disconnect(job_id, websocket)
-            db.close()
 
     return app
 
