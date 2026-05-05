@@ -101,3 +101,93 @@ def test_my_scores_ordered_by_date_desc(auth_client):
 def test_my_scores_requires_auth(client):
     response = client.get("/api/v1/scores/me")
     assert response.status_code == 403
+
+
+# ── Leaderboard username ───────────────────────────────────────────────────────
+
+def test_leaderboard_entry_has_username_field(auth_client):
+    _submit(auth_client, points=1000)
+    response = auth_client.get("/api/v1/scores/top?track_id=track-42")
+    assert response.status_code == 200
+    entry = response.json()[0]
+    assert "username" in entry
+
+
+def test_leaderboard_entry_username_is_none_without_username(auth_client):
+    # auth_client registers without username
+    _submit(auth_client, points=500)
+    response = auth_client.get("/api/v1/scores/top?track_id=track-42")
+    entry = response.json()[0]
+    assert entry["username"] is None
+
+
+def test_leaderboard_entry_username_populated(client):
+    client.post("/api/v1/auth/register",
+                json={"email": "pro@example.com", "password": "pass1234",
+                      "username": "ProGamer"})
+    r = client.post("/api/v1/auth/login",
+                    json={"email": "pro@example.com", "password": "pass1234"})
+    client.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})
+    client.post("/api/v1/scores", json={"track_id": "t1", "points": 9999})
+
+    response = client.get("/api/v1/scores/top?track_id=t1")
+    assert response.json()[0]["username"] == "ProGamer"
+
+
+# ── Global leaderboard ────────────────────────────────────────────────────────
+
+def test_global_leaderboard_empty(client):
+    response = client.get("/api/v1/scores/global")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_global_leaderboard_aggregates_points(auth_client):
+    _submit(auth_client, track_id="t1", points=1000)
+    _submit(auth_client, track_id="t2", points=2000)
+    _submit(auth_client, track_id="t3", points=500)
+
+    response = auth_client.get("/api/v1/scores/global")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["total_points"] == 3500
+    assert data[0]["games_played"] == 3
+    assert data[0]["rank"] == 1
+
+
+def test_global_leaderboard_ordered_by_total_points(client):
+    # user A — 5000 pts total
+    r_a = client.post("/api/v1/auth/register",
+                      json={"email": "a@ex.com", "password": "pass1234"})
+    client.headers.update({"Authorization": f"Bearer {r_a.json()['access_token']}"})
+    client.post("/api/v1/scores", json={"track_id": "t1", "points": 3000})
+    client.post("/api/v1/scores", json={"track_id": "t2", "points": 2000})
+
+    # user B — 1000 pts total
+    r_b = client.post("/api/v1/auth/register",
+                      json={"email": "b@ex.com", "password": "pass1234"})
+    client.headers.update({"Authorization": f"Bearer {r_b.json()['access_token']}"})
+    client.post("/api/v1/scores", json={"track_id": "t1", "points": 1000})
+
+    response = client.get("/api/v1/scores/global")
+    data = response.json()
+    assert data[0]["total_points"] == 5000
+    assert data[0]["rank"] == 1
+    assert data[1]["total_points"] == 1000
+    assert data[1]["rank"] == 2
+
+
+def test_global_leaderboard_limit(auth_client):
+    for i in range(5):
+        _submit(auth_client, track_id=f"t{i}", points=(i + 1) * 100)
+
+    response = auth_client.get("/api/v1/scores/global?limit=2")
+    assert response.status_code == 200
+    assert len(response.json()) == 1  # only 1 user regardless of limit
+
+
+def test_global_leaderboard_has_username_field(auth_client):
+    _submit(auth_client, points=100)
+    response = auth_client.get("/api/v1/scores/global")
+    assert "username" in response.json()[0]

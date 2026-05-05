@@ -50,7 +50,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Importer tous les modèles pour qu'ils s'enregistrent dans Base.metadata
-from src.api.db.models import Base, Job, Music, Playlist, Track, User
+from src.api.db.models import Base, GameSession, Job, Music, Playlist, Track, User
 from src.api.db.session import get_session
 
 # StaticPool : toutes les connexions partagent la même DB in-memory.
