@@ -40,8 +40,11 @@ from src.api.main import app  # déclenche app = create_app() avec les patches a
 _p_engine.stop()
 _p_minio.stop()
 
+import itertools
+
 import pytest
 from fastapi.testclient import TestClient
+from src.api.core.limiter import key_func as limiter_key_func
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -74,16 +77,24 @@ def db():
     session.close()
 
 
+_test_counter = itertools.count()
+
+
 @pytest.fixture
 def client(db):
     """Client HTTP qui utilise la DB de test à la place de PostgreSQL."""
     def _override():
         yield db
 
+    # IP unique par test pour ne pas déclencher le rate limiter entre tests
+    test_ip = f"test-{next(_test_counter)}"
+    limiter_key_func._override = lambda req: test_ip
+
     app.dependency_overrides[get_session] = _override
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+    limiter_key_func._override = None
 
 
 @pytest.fixture
