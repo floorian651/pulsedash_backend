@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from ..dependencies import get_current_user
 from ..db.session import get_session
 from ..db.repositories import track_repo
 from ..schemas.track import TrackCreate, TrackUpdate, TrackResponse
@@ -37,7 +38,7 @@ async def get_track(track_id: int, db: Session = Depends(get_session)):
 
 
 @router.post("", response_model=TrackResponse)
-async def create_track(track_data: TrackCreate, db: Session = Depends(get_session)):
+async def create_track(track_data: TrackCreate, db: Session = Depends(get_session), _=Depends(get_current_user)):
     """Create a new track in a playlist"""
     # Validate that the playlist and music exist
     from ..db.models import Playlist, Music
@@ -63,7 +64,7 @@ async def create_track(track_data: TrackCreate, db: Session = Depends(get_sessio
 
 @router.put("/{track_id}", response_model=TrackResponse)
 async def update_track(
-    track_id: int, track_data: TrackUpdate, db: Session = Depends(get_session)
+    track_id: int, track_data: TrackUpdate, db: Session = Depends(get_session), _=Depends(get_current_user)
 ):
     """Update track by ID"""
     track = track_repo.get_track(db, track_id)
@@ -77,7 +78,7 @@ async def update_track(
 
 
 @router.delete("/{track_id}")
-async def delete_track(track_id: int, db: Session = Depends(get_session)):
+async def delete_track(track_id: int, db: Session = Depends(get_session), _=Depends(get_current_user)):
     """Delete track by ID"""
     deleted = track_repo.delete_track(db, track_id)
     if not deleted:

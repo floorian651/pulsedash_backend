@@ -44,6 +44,6 @@ def test_get_generate_pending_job(auth_client, mock_celery):
     assert data["level"] is None
 
 
-def test_get_generate_unknown_job_returns_404(client):
-    response = client.get("/api/v1/generate/nonexistent-job-id")
+def test_get_generate_unknown_job_returns_404(auth_client):
+    response = auth_client.get("/api/v1/generate/nonexistent-job-id")
     assert response.status_code == 404
