@@ -8,8 +8,6 @@ class ScoreSubmit(BaseModel):
     track_id: str
     points: int = Field(..., ge=0)
     accuracy: Optional[float] = Field(None, ge=0.0, le=1.0)
-    # TODO: remplacer user_id par Depends(get_current_user) quand l'auth sera mergée
-    user_id: str
 
 
 class ScoreResponse(BaseModel):

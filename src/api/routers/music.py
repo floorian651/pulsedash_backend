@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from ..dependencies import get_current_user
 from ..services.jamendo import download_track
 from ..services.storage import StorageService
 from ..db.session import get_session
@@ -74,7 +75,7 @@ async def get_music_download_url(title: str, db: Session = Depends(get_session))
 
 
 @router.post("", response_model=MusicResponse)
-async def create_music(music_data: MusicCreate, db: Session = Depends(get_session)):
+async def create_music(music_data: MusicCreate, db: Session = Depends(get_session), _=Depends(get_current_user)):
     """Create a new music entry"""
     existing_music = music_repo.get_music(db, music_data.title)
     if existing_music:
@@ -99,7 +100,7 @@ MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 Mo
 
 @router.post("/upload/{title}")
 async def upload_music_file(
-    title: str, file: UploadFile = File(...), db: Session = Depends(get_session)
+    title: str, file: UploadFile = File(...), db: Session = Depends(get_session), _=Depends(get_current_user)
 ):
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
@@ -181,7 +182,7 @@ async def upload_music_file(
 
 @router.put("/{title}", response_model=MusicResponse)
 async def update_music(
-    title: str, music_data: MusicUpdate, db: Session = Depends(get_session)
+    title: str, music_data: MusicUpdate, db: Session = Depends(get_session), _=Depends(get_current_user)
 ):
     """Update music by title"""
     music = music_repo.get_music(db, title)
@@ -199,7 +200,7 @@ async def update_music(
 
 
 @router.delete("/{title}")
-async def delete_music(title: str, db: Session = Depends(get_session)):
+async def delete_music(title: str, db: Session = Depends(get_session), _=Depends(get_current_user)):
     """Delete music by title"""
     deleted = music_repo.delete_music(db, title)
     if not deleted:
@@ -208,7 +209,7 @@ async def delete_music(title: str, db: Session = Depends(get_session)):
 
 
 @router.post("/import-jamendo/{track_id}")
-async def import_jamendo_track(track_id: str):
+async def import_jamendo_track(track_id: str, _=Depends(get_current_user)):
     """
     Download music from Jamendo and save it to MinIO.
     Returns a presigned URL to download the file.

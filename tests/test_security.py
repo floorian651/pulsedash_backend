@@ -64,27 +64,27 @@ def _upload(client, title: str, filename: str):
     return response, upload_call
 
 
-def test_upload_path_traversal_in_filename(client):
+def test_upload_path_traversal_in_filename(auth_client):
     """Un filename comme ../../evil.sh ne doit pas sortir de music_files/."""
-    response, call = _upload(client, "legit_title", "../../../evil.sh")
+    response, call = _upload(auth_client, "legit_title", "../../../evil.sh")
     assert response.status_code == 200
     object_name = call[0][0]
     assert ".." not in object_name
     assert object_name.startswith("music_files/")
 
 
-def test_upload_special_chars_in_title(client):
+def test_upload_special_chars_in_title(auth_client):
     """Un title avec des caractères spéciaux est sanitisé dans le chemin MinIO."""
-    response, call = _upload(client, "song|rm -rf", "song.mp3")
+    response, call = _upload(auth_client, "song|rm -rf", "song.mp3")
     assert response.status_code == 200
     object_name = call[0][0]
     assert "|" not in object_name
     assert "rm" not in object_name or "_rm" in object_name
 
 
-def test_upload_null_byte_in_filename(client):
+def test_upload_null_byte_in_filename(auth_client):
     """Un null byte dans le nom de fichier ne doit pas atteindre MinIO."""
-    response, call = _upload(client, "normal_title", "file\x00.mp3")
+    response, call = _upload(auth_client, "normal_title", "file\x00.mp3")
     assert response.status_code == 200
     object_name = call[0][0]
     assert "\x00" not in object_name
@@ -102,48 +102,48 @@ def _upload_with_type(client, content_type: str, content: bytes = b"fake audio")
         )
 
 
-def test_upload_valid_content_types(client):
+def test_upload_valid_content_types(auth_client):
     for ct in ["audio/mpeg", "audio/wav", "audio/ogg", "audio/flac"]:
         with patch("src.api.routers.music.StorageService") as MockStorage:
             instance = MagicMock()
             instance.get_download_url.return_value = "http://minio/test"
             MockStorage.return_value = instance
-            response = client.post(
+            response = auth_client.post(
                 "/api/v1/music/upload/test_title",
                 files={"file": ("track.mp3", io.BytesIO(b"fake"), ct)},
             )
         assert response.status_code == 200, f"Attendu 200 pour {ct}, reçu {response.status_code}"
 
 
-def test_upload_invalid_content_type_returns_415(client):
-    response = _upload_with_type(client, "application/pdf")
+def test_upload_invalid_content_type_returns_415(auth_client):
+    response = _upload_with_type(auth_client, "application/pdf")
     assert response.status_code == 415
 
 
-def test_upload_executable_content_type_returns_415(client):
-    response = _upload_with_type(client, "application/octet-stream")
+def test_upload_executable_content_type_returns_415(auth_client):
+    response = _upload_with_type(auth_client, "application/octet-stream")
     assert response.status_code == 415
 
 
-def test_upload_file_too_large_returns_413(client):
+def test_upload_file_too_large_returns_413(auth_client):
     from src.api.routers.music import MAX_UPLOAD_SIZE
     oversized = b"x" * (MAX_UPLOAD_SIZE + 1)
     with patch("src.api.routers.music.StorageService"):
-        response = client.post(
+        response = auth_client.post(
             "/api/v1/music/upload/test_title",
             files={"file": ("big.mp3", io.BytesIO(oversized), "audio/mpeg")},
         )
     assert response.status_code == 413
 
 
-def test_upload_at_size_limit_is_accepted(client):
+def test_upload_at_size_limit_is_accepted(auth_client):
     from src.api.routers.music import MAX_UPLOAD_SIZE
     exact_size = b"x" * MAX_UPLOAD_SIZE
     with patch("src.api.routers.music.StorageService") as MockStorage:
         instance = MagicMock()
         instance.get_download_url.return_value = "http://minio/test"
         MockStorage.return_value = instance
-        response = client.post(
+        response = auth_client.post(
             "/api/v1/music/upload/test_title",
             files={"file": ("exact.mp3", io.BytesIO(exact_size), "audio/mpeg")},
         )

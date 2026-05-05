@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from ..dependencies import get_current_user
 from ..db.session import get_session
 from ..db.repositories import playlist_repo
 from ..schemas.playlist import PlaylistCreate, PlaylistUpdate, PlaylistResponse
@@ -27,7 +28,7 @@ async def get_playlist(name: str, db: Session = Depends(get_session)):
 
 @router.post("", response_model=PlaylistResponse)
 async def create_playlist(
-    playlist_data: PlaylistCreate, db: Session = Depends(get_session)
+    playlist_data: PlaylistCreate, db: Session = Depends(get_session), _=Depends(get_current_user)
 ):
     """Create a new playlist"""
     existing_playlist = playlist_repo.get_playlist(db, playlist_data.name)
@@ -44,7 +45,7 @@ async def create_playlist(
 
 @router.put("/{name}", response_model=PlaylistResponse)
 async def update_playlist(
-    name: str, playlist_data: PlaylistUpdate, db: Session = Depends(get_session)
+    name: str, playlist_data: PlaylistUpdate, db: Session = Depends(get_session), _=Depends(get_current_user)
 ):
     """Update playlist by name"""
     playlist = playlist_repo.get_playlist(db, name)
@@ -58,7 +59,7 @@ async def update_playlist(
 
 
 @router.delete("/{name}")
-async def delete_playlist(name: str, db: Session = Depends(get_session)):
+async def delete_playlist(name: str, db: Session = Depends(get_session), _=Depends(get_current_user)):
     """Delete playlist by name (also deletes all its tracks)"""
     deleted = playlist_repo.delete_playlist(db, name)
     if not deleted:

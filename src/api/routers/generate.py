@@ -33,11 +33,18 @@ async def generate_level(request: Request, body: GenerateRequest, db: Session = 
 
 
 @router.get("/generate/{job_id}", response_model=GenerateResponse)
-async def get_generate_result(job_id: str, db: Session = Depends(get_session)):
+async def get_generate_result(
+    job_id: str,
+    db: Session = Depends(get_session),
+    current_user=Depends(get_current_user),
+):
     job = job_repo.get_job(db, job_id)
 
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    if str(job.user_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Accès refusé")
 
     level_data = None
 
