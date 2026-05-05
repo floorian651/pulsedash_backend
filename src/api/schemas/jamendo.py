@@ -9,3 +9,9 @@ class JamendoTrack(BaseModel):
     duration: int
     image: Optional[str]
     audio: Optional[str]
+
+
+class ImportAccepted(BaseModel):
+    job_id: str
+    music_title: str
+    state: str

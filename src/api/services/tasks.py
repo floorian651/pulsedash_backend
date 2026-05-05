@@ -12,7 +12,6 @@ from src.api.db.repositories.job_repo import JobState
 
 
 def _publish(job_id: str, state: str, progress: int, error: str | None = None) -> None:
-    """Publie l'état du job sur le channel Redis correspondant."""
     from src.api.core.config import get_settings
     settings = get_settings()
     try:
@@ -27,8 +26,12 @@ def _publish(job_id: str, state: str, progress: int, error: str | None = None) -
 
 
 @app.task(name="generate_level")
-def generate_level_task(job_id: str, track_id: str):
-    """Télécharge un MP3, lance le pipeline, stocke le résultat au format Unity."""
+def generate_level_task(job_id: str, track_id: str, audio_object: str | None = None):
+    """Analyse un fichier audio et stocke le level.json dans MinIO.
+
+    Si audio_object est fourni, l'audio est lu depuis le bucket music de MinIO
+    (évite un double téléchargement depuis Jamendo).
+    """
     db = next(get_session())
     audio_path = None
     level_path = None
@@ -39,35 +42,40 @@ def generate_level_task(job_id: str, track_id: str):
         _publish(job_id, JobState.RUNNING, 0)
         logger.info(f"Job {job_id}: processing track {track_id}")
 
-        # 1. Télécharger le MP3 via Jamendo (0 → 20%)
-        from src.api.services.jamendo import download_track
+        from src.api.services.storage import StorageService
 
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
             audio_path = tmp.name
-        download_track(track_id, audio_path)
-        job_repo.update_job_progress(db, job_id, 20)
-        _publish(job_id, JobState.RUNNING, 20)
-        logger.info(f"Job {job_id}: audio downloaded")
 
-        # 2. Stocker l'audio dans MinIO (20 → 40%)
-        from src.api.services.storage import StorageService
+        if audio_object:
+            # Audio déjà dans MinIO — on le récupère directement
+            storage_music = StorageService(bucket_type="music")
+            storage_music.download_file(audio_object, audio_path)
+            job_repo.update_job_progress(db, job_id, 40)
+            _publish(job_id, JobState.RUNNING, 40)
+            logger.info(f"Job {job_id}: audio fetched from MinIO ({audio_object})")
+        else:
+            # Téléchargement depuis Jamendo (0 → 20%) puis upload dans MinIO (20 → 40%)
+            from src.api.services.jamendo import download_track
+            download_track(track_id, audio_path)
+            job_repo.update_job_progress(db, job_id, 20)
+            _publish(job_id, JobState.RUNNING, 20)
+            logger.info(f"Job {job_id}: audio downloaded from Jamendo")
 
-        storage_audio = StorageService(bucket_type="audio")
-        audio_object = f"{job_id}/{track_id}.mp3"
-        storage_audio.upload_file(audio_object, audio_path)
-        job_repo.update_job_progress(db, job_id, 40)
-        _publish(job_id, JobState.RUNNING, 40)
-        logger.info(f"Job {job_id}: audio uploaded to MinIO")
+            storage_audio = StorageService(bucket_type="audio")
+            storage_audio.upload_file(f"{job_id}/{track_id}.mp3", audio_path)
+            job_repo.update_job_progress(db, job_id, 40)
+            _publish(job_id, JobState.RUNNING, 40)
+            logger.info(f"Job {job_id}: audio uploaded to MinIO")
 
-        # 3. Lancer le pipeline d'analyse (40 → 85%)
+        # Pipeline d'analyse (40 → 85%)
         from src.pipeline.main import main as run_pipeline
-
         level_data = run_pipeline(audio_path)
         job_repo.update_job_progress(db, job_id, 85)
         _publish(job_id, JobState.RUNNING, 85)
         logger.info(f"Job {job_id}: pipeline completed — {len(level_data.get('hits', []))} hits")
 
-        # 4. Sauvegarder le level.json dans MinIO (85 → 100%)
+        # Sauvegarde du level.json dans MinIO (85 → 100%)
         with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as tmp:
             json.dump(level_data, tmp)
             level_path = tmp.name

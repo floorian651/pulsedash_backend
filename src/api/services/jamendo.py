@@ -37,6 +37,33 @@ def search_tracks(query: str, limit: int = 10) -> list[dict]:
     ]
 
 
+def get_track_info(track_id: str) -> dict:
+    """Retourne les métadonnées d'un track Jamendo (sans télécharger l'audio)."""
+    settings = get_settings()
+    resp = requests.get(
+        JAMENDO_TRACKS_URL,
+        params={
+            "client_id": settings.JAMENDO_CLIENT_ID,
+            "id": track_id,
+            "format": "json",
+            "audioformat": "mp32",
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
+    results = resp.json().get("results", [])
+    if not results:
+        raise ValueError(f"Track {track_id} not found on Jamendo")
+    t = results[0]
+    return {
+        "id": t["id"],
+        "name": t["name"],
+        "artist_name": t["artist_name"],
+        "duration": int(t.get("duration", 0)),
+        "audiodownload": t.get("audiodownload") or t.get("audio"),
+    }
+
+
 def download_track(track_id: str, dest_path: str) -> str:
     """Télécharge un MP3 depuis Jamendo et l'écrit dans dest_path."""
     settings = get_settings()
