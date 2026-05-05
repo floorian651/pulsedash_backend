@@ -154,10 +154,10 @@ def test_upload_at_size_limit_is_accepted(client):
 # Rate limiting
 # ---------------------------------------------------------------------------
 
-def test_rate_limit_generate(client, mock_celery):
+def test_rate_limit_generate(auth_client, mock_celery):
     """Au-delà de 10 requêtes/min depuis la même IP, l'API doit retourner 429."""
     responses = [
-        client.post("/api/v1/generate", json={"track_id": str(i)})
+        auth_client.post("/api/v1/generate", json={"track_id": str(i)})
         for i in range(12)
     ]
     status_codes = [r.status_code for r in responses]

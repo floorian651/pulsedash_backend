@@ -103,3 +103,16 @@ def mock_celery():
     with patch("src.api.routers.generate.generate_level_task") as mock_task:
         mock_task.delay.return_value = MagicMock(id="fake-celery-id")
         yield mock_task
+
+
+@pytest.fixture
+def auth_client(client):
+    """Client HTTP avec un token JWT valide pré-injecté dans les headers."""
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"email": "test@example.com", "password": "testpassword123"},
+    )
+    assert r.status_code == 201, r.text
+    token = r.json()["access_token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return client

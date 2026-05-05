@@ -19,7 +19,7 @@
 import asyncio
 import json
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -28,8 +28,9 @@ from slowapi.errors import RateLimitExceeded
 from src.api.core.config import get_settings
 from src.api.core.limiter import limiter
 from src.api.db.session import init_engine, get_session
-from src.api.db.repositories import job_repo
-from src.api.routers import generate, jobs, music, playlists, scores, tracks
+from src.api.db.repositories import job_repo, user_repo
+from src.api.routers import auth, generate, jobs, music, playlists, scores, tracks
+from src.api.services.auth import decode_token
 from src.api.services.storage import ensure_buckets_exist
 from src.api.utils.websocket_manager import WebSocketManager
 
@@ -70,6 +71,8 @@ def create_app() -> FastAPI:
     # ---------------------------------------------------------
     # Routers
     # ---------------------------------------------------------
+    app.include_router(auth.router, prefix=settings.API_V1_PREFIX, tags=["auth"])
+
     app.include_router(
         generate.router, prefix=settings.API_V1_PREFIX, tags=["generate"]
     )
@@ -97,9 +100,22 @@ def create_app() -> FastAPI:
     # WebSocket: suivi des jobs en temps réel
     # ---------------------------------------------------------
     @app.websocket("/ws/jobs/{job_id}")
-    async def job_ws(websocket: WebSocket, job_id: str):
-        await ws_manager.connect(job_id, websocket)
+    async def job_ws(websocket: WebSocket, job_id: str, token: str = Query(...)):
         db = next(get_session())
+        try:
+            user_id = decode_token(token)
+        except Exception:
+            await websocket.close(code=1008)
+            db.close()
+            return
+
+        user = user_repo.get_user_by_id(db, user_id)
+        if not user or not user.is_active:
+            await websocket.close(code=1008)
+            db.close()
+            return
+
+        await ws_manager.connect(job_id, websocket)
         try:
             last_state = None
             last_progress = -1
@@ -107,6 +123,9 @@ def create_app() -> FastAPI:
                 job = job_repo.get_job(db, job_id)
                 if not job:
                     await websocket.send_text(json.dumps({"error": "job not found"}))
+                    break
+                if str(job.user_id) != user_id:
+                    await websocket.close(code=1008)
                     break
 
                 state = job.state.value if hasattr(job.state, "value") else job.state

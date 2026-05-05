@@ -15,6 +15,7 @@ from src.api.db.repositories.job_repo import JobState
 from src.api.schemas.generate import GenerateRequest, GenerateAccepted, GenerateResponse
 from src.api.services.tasks import generate_level_task
 from src.api.services.storage import StorageService
+from src.api.dependencies import get_current_user
 from loguru import logger
 
 router = APIRouter()
@@ -23,9 +24,9 @@ settings = get_settings()
 
 @router.post("/generate", response_model=GenerateAccepted, status_code=202)
 @limiter.limit("10/minute")
-async def generate_level(request: Request, body: GenerateRequest, db: Session = Depends(get_session)):
+async def generate_level(request: Request, body: GenerateRequest, db: Session = Depends(get_session), current_user = Depends(get_current_user)):
     job_id = str(uuid.uuid4())
-    job_repo.create_job(db, job_id=job_id)
+    job_repo.create_job(db, job_id=job_id, user_id=current_user.id)
     generate_level_task.delay(job_id, body.track_id)
     logger.info(f"Job {job_id} queued for track {body.track_id}")
     return GenerateAccepted(job_id=job_id, state=JobState.PENDING)
