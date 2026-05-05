@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -28,7 +28,7 @@ def end_session(
     if not session:
         return None
     session.status = "abandoned" if abandoned else "completed"
-    session.ended_at = datetime.utcnow()
+    session.ended_at = datetime.now(timezone.utc)
     session.final_score = final_score
     session.accuracy = accuracy
     db.commit()

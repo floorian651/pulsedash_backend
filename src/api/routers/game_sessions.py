@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.api.db.session import get_session
-from src.api.db.repositories import game_session_repo
+from src.api.db.repositories import game_session_repo, score_repo
 from src.api.db.models.Music import Music
 from src.api.schemas.game_session import GameSessionEnd, GameSessionResponse, GameSessionStart
 from src.api.dependencies import get_current_user
@@ -40,13 +40,25 @@ async def end_session(
     if session.status != "active":
         raise HTTPException(status_code=409, detail="Session already ended")
 
-    return game_session_repo.end_session(
+    updated = game_session_repo.end_session(
         db,
         session_id=session_id,
         final_score=body.final_score,
         accuracy=body.accuracy,
         abandoned=body.abandoned,
     )
+
+    if not body.abandoned:
+        score_repo.create_score(
+            db,
+            user_id=str(current_user.id),
+            session_id=session_id,
+            music_title=session.music_title,
+            points=body.final_score,
+            accuracy=body.accuracy,
+        )
+
+    return updated
 
 
 @router.get("/me", response_model=list[GameSessionResponse])
