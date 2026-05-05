@@ -25,5 +25,14 @@ class ScoreResponse(BaseModel):
 class LeaderboardEntry(BaseModel):
     rank: int
     user_id: str
+    username: Optional[str]
     points: int
     accuracy: Optional[float]
+
+
+class GlobalLeaderboardEntry(BaseModel):
+    rank: int
+    user_id: str
+    username: Optional[str]
+    total_points: int
+    games_played: int

@@ -5,5 +5,6 @@ from .Music import Music
 from .Playlist import Playlist
 from .Score import Score
 from .Track import Track
+from .GameSession import GameSession
 
-__all__ = ["Base", "User", "Job", "Music", "Playlist", "Score", "Track"]
+__all__ = ["Base", "User", "Job", "Music", "Playlist", "Score", "Track", "GameSession"]
