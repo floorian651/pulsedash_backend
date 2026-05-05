@@ -6,6 +6,37 @@ from src.api.core.config import get_settings
 JAMENDO_TRACKS_URL = "https://api.jamendo.com/v3.0/tracks"
 
 
+def search_tracks(query: str, limit: int = 10) -> list[dict]:
+    """Recherche des tracks Jamendo par titre. Retourne une liste de résultats."""
+    settings = get_settings()
+
+    resp = requests.get(
+        JAMENDO_TRACKS_URL,
+        params={
+            "client_id": settings.JAMENDO_CLIENT_ID,
+            "format": "json",
+            "namesearch": query,
+            "limit": limit,
+            "audioformat": "mp32",
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    return [
+        {
+            "id": t["id"],
+            "name": t["name"],
+            "artist_name": t["artist_name"],
+            "duration": t["duration"],
+            "image": t.get("image"),
+            "audio": t.get("audio"),
+        }
+        for t in data.get("results", [])
+    ]
+
+
 def download_track(track_id: str, dest_path: str) -> str:
     """Télécharge un MP3 depuis Jamendo et l'écrit dans dest_path."""
     settings = get_settings()
