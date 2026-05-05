@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from src.api.db.session import get_session
 from src.api.db.repositories import score_repo
-from src.api.schemas.score import LeaderboardEntry, ScoreResponse, ScoreSubmit
+from src.api.schemas.score import GlobalLeaderboardEntry, LeaderboardEntry, ScoreResponse, ScoreSubmit
 from src.api.dependencies import get_current_user
 
 router = APIRouter(prefix="/scores", tags=["scores"])
@@ -30,10 +30,28 @@ async def get_leaderboard(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_session),
 ):
-    scores = score_repo.get_top_scores(db, track_id=track_id, limit=limit)
+    rows = score_repo.get_top_scores(db, track_id=track_id, limit=limit)
     return [
-        LeaderboardEntry(rank=i + 1, user_id=s.user_id, points=s.points, accuracy=s.accuracy)
-        for i, s in enumerate(scores)
+        LeaderboardEntry(rank=i + 1, user_id=s.user_id, username=username, points=s.points, accuracy=s.accuracy)
+        for i, (s, username) in enumerate(rows)
+    ]
+
+
+@router.get("/global", response_model=list[GlobalLeaderboardEntry])
+async def get_global_leaderboard(
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_session),
+):
+    rows = score_repo.get_global_top(db, limit=limit)
+    return [
+        GlobalLeaderboardEntry(
+            rank=i + 1,
+            user_id=row.user_id,
+            username=row.username,
+            total_points=row.total_points,
+            games_played=row.games_played,
+        )
+        for i, row in enumerate(rows)
     ]
 
 

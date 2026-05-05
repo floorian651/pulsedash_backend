@@ -29,7 +29,7 @@ from src.api.core.config import get_settings
 from src.api.core.limiter import limiter
 from src.api.db.session import init_engine, get_session
 from src.api.db.repositories import job_repo, user_repo
-from src.api.routers import auth, generate, jobs, music, playlists, scores, tracks
+from src.api.routers import auth, game_sessions, generate, jobs, music, playlists, profile, scores, tracks
 from src.api.services.auth import decode_token
 from src.api.services.storage import ensure_buckets_exist
 from src.api.utils.websocket_manager import WebSocketManager
@@ -88,6 +88,10 @@ def create_app() -> FastAPI:
     app.include_router(tracks.router, prefix=settings.API_V1_PREFIX, tags=["tracks"])
 
     app.include_router(scores.router, prefix=settings.API_V1_PREFIX, tags=["scores"])
+
+    app.include_router(game_sessions.router, prefix=settings.API_V1_PREFIX, tags=["game-sessions"])
+
+    app.include_router(profile.router, prefix=settings.API_V1_PREFIX, tags=["profile"])
 
     # ---------------------------------------------------------
     # Healthcheck
