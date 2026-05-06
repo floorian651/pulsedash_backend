@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, Integer, String
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 
 from .base import Base
 
@@ -10,10 +10,11 @@ class Score(Base):
 
     id = Column(Integer, autoincrement=True, primary_key=True)
     user_id = Column(String, nullable=False, index=True)
-    track_id = Column(String, nullable=False, index=True)
+    session_id = Column(String, nullable=True, unique=True, index=True)
+    music_title = Column(String, ForeignKey("music.title", ondelete="RESTRICT"), nullable=False, index=True)
     points = Column(Integer, nullable=False)
-    accuracy = Column(Float, nullable=True)   # % de notes touchées
-    created_at = Column(DateTime, default=datetime.utcnow)
+    accuracy = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
-        return f"<Score(user={self.user_id}, track={self.track_id}, points={self.points})>"
+        return f"<Score(user={self.user_id}, music={self.music_title}, points={self.points})>"

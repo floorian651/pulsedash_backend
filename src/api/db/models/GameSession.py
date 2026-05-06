@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, Integer, String
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 
 from .base import Base
 
@@ -11,10 +11,10 @@ class GameSession(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, nullable=False, index=True)
-    music_title = Column(String, nullable=False, index=True)
+    music_title = Column(String, ForeignKey("music.title", ondelete="RESTRICT"), nullable=False, index=True)
     status = Column(String, nullable=False, default="active")  # active | completed | abandoned
-    started_at = Column(DateTime, default=datetime.utcnow)
-    ended_at = Column(DateTime, nullable=True)
+    started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    ended_at = Column(DateTime(timezone=True), nullable=True)
     final_score = Column(Integer, nullable=True)
     accuracy = Column(Float, nullable=True)
 

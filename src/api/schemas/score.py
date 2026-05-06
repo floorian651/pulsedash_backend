@@ -1,19 +1,14 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
-
-
-class ScoreSubmit(BaseModel):
-    track_id: str
-    points: int = Field(..., ge=0)
-    accuracy: Optional[float] = Field(None, ge=0.0, le=1.0)
+from pydantic import BaseModel
 
 
 class ScoreResponse(BaseModel):
     id: int
     user_id: str
-    track_id: str
+    session_id: Optional[str]
+    music_title: str
     points: int
     accuracy: Optional[float]
     created_at: datetime
