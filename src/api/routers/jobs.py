@@ -21,15 +21,14 @@ async def get_job_status(
     if str(job.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé")
 
-    response = {
+    result_url = None
+    if job.state == "completed" and job.result_path:
+        result_url = StorageService(bucket_type="levels").get_download_url(job.result_path)
+
+    return {
         "job_id": job.id,
         "state": job.state,
         "progress": job.progress,
-        "result_url": None,
+        "result_url": result_url,
+        "error": getattr(job, "error_message", None),
     }
-
-    if job.state == "completed" and job.result_path:
-        storage = StorageService(bucket_type="levels")
-        response["result_url"] = storage.get_download_url(job.result_path)
-
-    return response

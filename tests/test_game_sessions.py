@@ -122,6 +122,30 @@ def test_end_session_accuracy_out_of_range_returns_422(auth_client, music):
     assert r.status_code == 422
 
 
+# ── Score auto-creation ────────────────────────────────────────────────────────
+
+def test_end_session_completed_creates_score(auth_client, music):
+    session_id = _start(auth_client).json()["id"]
+    _end(auth_client, session_id, final_score=7500, accuracy=0.85)
+
+    r = auth_client.get("/api/v1/scores/me")
+    assert r.status_code == 200
+    scores = r.json()
+    assert len(scores) == 1
+    assert scores[0]["points"] == 7500
+    assert scores[0]["music_title"] == "test-music"
+    assert scores[0]["session_id"] == session_id
+
+
+def test_end_session_abandoned_does_not_create_score(auth_client, music):
+    session_id = _start(auth_client).json()["id"]
+    _end(auth_client, session_id, final_score=0, accuracy=None, abandoned=True)
+
+    r = auth_client.get("/api/v1/scores/me")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
 # ── My sessions ────────────────────────────────────────────────────────────────
 
 def test_my_sessions_empty(auth_client):

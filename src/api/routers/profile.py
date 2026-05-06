@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.api.db.session import get_session
-from src.api.db.models.GameSession import GameSession
 from src.api.db.repositories import user_repo
+from src.api.db.repositories.game_session_repo import get_profile_stats
 from src.api.schemas.profile import ProfileResponse, ProfileStats
 from src.api.dependencies import get_current_user
 
@@ -16,29 +15,19 @@ def _build_profile(db: Session, user_id: str) -> ProfileResponse:
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    sessions = db.query(GameSession).filter(GameSession.user_id == user_id).all()
-
-    total_games = len(sessions)
-    completed = [s for s in sessions if s.status == "completed"]
-    completed_games = len(completed)
-
-    scores = [s.final_score for s in completed if s.final_score is not None]
-    total_points = sum(scores)
-    best_score = max(scores) if scores else None
-
-    accuracies = [s.accuracy for s in completed if s.accuracy is not None]
-    average_accuracy = sum(accuracies) / len(accuracies) if accuracies else None
+    stats = get_profile_stats(db, user_id)
+    avg = stats.average_accuracy
 
     return ProfileResponse(
         user_id=user_id,
         username=user.username,
         member_since=user.created_at,
         stats=ProfileStats(
-            total_games=total_games,
-            completed_games=completed_games,
-            total_points=total_points,
-            best_score=best_score,
-            average_accuracy=round(average_accuracy, 4) if average_accuracy is not None else None,
+            total_games=stats.total_games,
+            completed_games=stats.completed_games,
+            total_points=stats.total_points,
+            best_score=stats.best_score,
+            average_accuracy=round(avg, 4) if avg is not None else None,
         ),
     )
 
