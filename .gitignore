@@ -84,3 +84,4 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+UNITY_API_GUIDE.md
