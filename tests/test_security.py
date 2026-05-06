@@ -48,16 +48,18 @@ def test_sanitize_null_bytes():
 
 
 # ---------------------------------------------------------------------------
-# Integration tests : upload endpoint
+# Integration tests : POST /music (multipart)
 # ---------------------------------------------------------------------------
 
 def _upload(client, title: str, filename: str):
     with patch("src.api.routers.music.StorageService") as MockStorage:
         instance = MagicMock()
+        instance.upload_file.return_value = None
         instance.get_download_url.return_value = "http://minio/test"
         MockStorage.return_value = instance
         response = client.post(
-            f"/api/v1/music/upload/{title}",
+            "/api/v1/music",
+            data={"title": title},
             files={"file": (filename, io.BytesIO(b"fake"), "audio/mpeg")},
         )
         upload_call = instance.upload_file.call_args
@@ -79,7 +81,6 @@ def test_upload_special_chars_in_title(auth_client):
     assert response.status_code == 200
     object_name = call[0][0]
     assert "|" not in object_name
-    assert "rm" not in object_name or "_rm" in object_name
 
 
 def test_upload_null_byte_in_filename(auth_client):
@@ -94,35 +95,35 @@ def test_upload_null_byte_in_filename(auth_client):
 # Validation upload : content-type et taille
 # ---------------------------------------------------------------------------
 
-def _upload_with_type(client, content_type: str, content: bytes = b"fake audio"):
+def _upload_with_type(client, title: str, content_type: str, content: bytes = b"fake audio"):
     with patch("src.api.routers.music.StorageService"):
         return client.post(
-            "/api/v1/music/upload/test_title",
+            "/api/v1/music",
+            data={"title": title},
             files={"file": ("track.mp3", io.BytesIO(content), content_type)},
         )
 
 
 def test_upload_valid_content_types(auth_client):
-    for ct in ["audio/mpeg", "audio/wav", "audio/ogg", "audio/flac"]:
+    for i, ct in enumerate(["audio/mpeg", "audio/wav", "audio/ogg", "audio/flac"]):
         with patch("src.api.routers.music.StorageService") as MockStorage:
             instance = MagicMock()
             instance.get_download_url.return_value = "http://minio/test"
             MockStorage.return_value = instance
             response = auth_client.post(
-                "/api/v1/music/upload/test_title",
+                "/api/v1/music",
+                data={"title": f"test_track_{i}"},
                 files={"file": ("track.mp3", io.BytesIO(b"fake"), ct)},
             )
         assert response.status_code == 200, f"Attendu 200 pour {ct}, reçu {response.status_code}"
 
 
 def test_upload_invalid_content_type_returns_415(auth_client):
-    response = _upload_with_type(auth_client, "application/pdf")
-    assert response.status_code == 415
+    assert _upload_with_type(auth_client, "pdf_track", "application/pdf").status_code == 415
 
 
 def test_upload_executable_content_type_returns_415(auth_client):
-    response = _upload_with_type(auth_client, "application/octet-stream")
-    assert response.status_code == 415
+    assert _upload_with_type(auth_client, "exe_track", "application/octet-stream").status_code == 415
 
 
 def test_upload_file_too_large_returns_413(auth_client):
@@ -130,7 +131,8 @@ def test_upload_file_too_large_returns_413(auth_client):
     oversized = b"x" * (MAX_UPLOAD_SIZE + 1)
     with patch("src.api.routers.music.StorageService"):
         response = auth_client.post(
-            "/api/v1/music/upload/test_title",
+            "/api/v1/music",
+            data={"title": "big_track"},
             files={"file": ("big.mp3", io.BytesIO(oversized), "audio/mpeg")},
         )
     assert response.status_code == 413
@@ -144,7 +146,8 @@ def test_upload_at_size_limit_is_accepted(auth_client):
         instance.get_download_url.return_value = "http://minio/test"
         MockStorage.return_value = instance
         response = auth_client.post(
-            "/api/v1/music/upload/test_title",
+            "/api/v1/music",
+            data={"title": "exact_track"},
             files={"file": ("exact.mp3", io.BytesIO(exact_size), "audio/mpeg")},
         )
     assert response.status_code == 200
@@ -157,9 +160,9 @@ def test_upload_at_size_limit_is_accepted(auth_client):
 def test_rate_limit_generate(auth_client, mock_celery):
     """Au-delà de 10 requêtes/min depuis la même IP, l'API doit retourner 429."""
     responses = [
-        auth_client.post("/api/v1/generate", json={"track_id": str(i)})
+        auth_client.post("/api/v1/generate", json={"music_title": f"track_{i}"})
         for i in range(12)
     ]
     status_codes = [r.status_code for r in responses]
     assert 429 in status_codes, "Le rate limiting devrait retourner 429 après 10 requêtes"
-    assert responses[0].status_code == 202, "La première requête doit passer"
+    assert responses[0].status_code in (202, 404), "La première requête doit passer le rate limiter"

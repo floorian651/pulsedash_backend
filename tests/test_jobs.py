@@ -45,7 +45,7 @@ def test_get_job_failed_with_error(auth_client, db):
     job_repo.update_job_state(db, job_id, JobState.FAILED)
     job_repo.set_error_message(db, job_id, "Jamendo track not found")
 
-    response = auth_client.get(f"/api/v1/generate/{job_id}")
+    response = auth_client.get(f"/api/v1/jobs/{job_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["state"] == "failed"
