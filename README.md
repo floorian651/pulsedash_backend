@@ -63,17 +63,30 @@ cp .env.example .env
 | `JAMENDO_CLIENT_ID` | Client ID de l'API Jamendo |
 | `TUNNEL_TOKEN` | Token Cloudflare Tunnel (optionnel) |
 
-### Lancement
+### Lancement en local (sans Cloudflare Tunnel)
+
+Démarrer uniquement les services nécessaires en excluant le tunnel :
 
 ```bash
-# Infrastructure + API + Celery
-podman-compose -f podman-compose.yml up -d
+podman-compose up -d db redis minio api celery
 
-# Migrations
+# Migrations (attendre que l'API soit prête)
 podman exec pulsedash_api alembic -c alembic.ini upgrade head
 ```
 
-L'API est disponible sur `http://localhost:9050`. Documentation interactive : `http://localhost:9050/docs`.
+| Service | Accès |
+|---------|-------|
+| API REST | `http://localhost:9050` |
+| Documentation interactive (Swagger) | `http://localhost:9050/docs` |
+| ReDoc | `http://localhost:9050/redoc` |
+
+> MinIO, Redis et PostgreSQL ne sont pas exposés sur l'hôte par défaut (réseau interne `pulsedash-network`). Pour accéder à la console MinIO depuis le navigateur, ajouter `ports: ["9000:9000", "9001:9001"]` au service `minio` dans `podman-compose.yml`.
+
+### Lancement complet (avec tunnel)
+
+```bash
+podman-compose up -d
+```
 
 ### Développement local
 
