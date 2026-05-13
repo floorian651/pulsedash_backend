@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from src.api.core.limiter import limiter
 from src.api.db.session import get_session
@@ -17,7 +18,20 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     if user_repo.get_user_by_email(db, body.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email déjà utilisé")
 
-    user = user_repo.create_user(db, email=body.email, password=hash_password(body.password), username=body.username)
+    if user_repo.get_user_by_username(db, body.username):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nom d'utilisateur déjà utilisé")
+
+    try:
+        user = user_repo.create_user(db, email=body.email, password=hash_password(body.password), username=body.username)
+    except IntegrityError as e:
+        db.rollback()
+        if "username" in str(e):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nom d'utilisateur déjà utilisé")
+        elif "email" in str(e):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email déjà utilisé")
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erreur lors de la création du compte")
+    
     user_id = str(user.id)
     return TokenResponse(access_token=create_access_token(user_id), refresh_token=create_refresh_token(user_id))
 
