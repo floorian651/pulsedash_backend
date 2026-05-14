@@ -35,6 +35,7 @@ services:
     build:
       context: .
       dockerfile: Docker/Api.Dockerfile
+      target: prod
     container_name: pulsedash_api
     env_file: .env
     ports:
@@ -62,12 +63,13 @@ services:
       - minio
     volumes:
       - ./src:/app/src:Z
-    command: celery -A src.api.core.celery_app worker --loglevel=info --concurrency=4
+    command: uv run celery -A src.api.core.celery_app worker --loglevel=info --concurrency=4
     networks:
       - pulsedash-network
 
   tunnel:
-    image: cloudflare/cloudflared:latest
+    image: docker.io/cloudflare/cloudflared:latest
+    container_name: pulsedash_tunnel
     restart: unless-stopped
     env_file: .env
     command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
