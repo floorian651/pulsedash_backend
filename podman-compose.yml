@@ -8,6 +8,8 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data:Z
+    ports:
+      - "5432:5432"
     networks:
       - pulsedash-network
 
@@ -28,6 +30,8 @@ services:
     volumes:
       - minio_data:/data:Z
     command: server /data --console-address ":9001"
+    ports:
+      - "9001:9001"
     networks:
       - pulsedash-network
 
