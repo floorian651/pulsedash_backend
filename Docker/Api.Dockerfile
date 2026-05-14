@@ -25,7 +25,7 @@ RUN uv sync --frozen --no-install-project --no-dev
 COPY src/ ./src/
 COPY alembic.ini ./
 
-CMD ["uv", "run", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "9050"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "9050"]
 
 # ---------- Development ----------
 FROM base AS dev
@@ -35,4 +35,4 @@ RUN uv sync --frozen --no-install-project
 COPY src/ ./src/
 COPY alembic.ini ./
 
-CMD ["uv", "run", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "9050", "--reload"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "9050", "--reload"]

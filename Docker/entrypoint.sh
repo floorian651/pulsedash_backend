@@ -1,4 +1,4 @@
 #!/bin/sh
 set -e
-uv run alembic upgrade head
+uv run --no-sync alembic upgrade head
 exec "$@"
