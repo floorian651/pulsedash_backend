@@ -1,6 +1,8 @@
-from sqlalchemy import Column, String, DateTime
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, DateTime, String
 from sqlalchemy.orm import relationship
-from datetime import datetime
+
 from .base import Base
 
 
@@ -9,7 +11,7 @@ class Playlist(Base):
 
     name = Column(String, primary_key=True)
     description = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # On utilise la chaîne "Track" pour éviter l'import circulaire
     tracks = relationship(
