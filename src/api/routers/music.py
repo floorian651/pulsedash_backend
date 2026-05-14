@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, get_admin_user
 from ..services.storage import StorageService
 from ..db.session import get_session
 from ..db.repositories import music_repo
@@ -121,7 +121,7 @@ async def create_music(
 
 @router.put("/{title}", response_model=MusicResponse)
 async def update_music(
-    title: str, music_data: MusicUpdate, db: Session = Depends(get_session), _=Depends(get_current_user)
+    title: str, music_data: MusicUpdate, db: Session = Depends(get_session), _=Depends(get_admin_user)
 ):
     music = music_repo.get_music(db, title)
     if not music:
@@ -130,7 +130,7 @@ async def update_music(
 
 
 @router.delete("/{title}")
-async def delete_music(title: str, db: Session = Depends(get_session), _=Depends(get_current_user)):
+async def delete_music(title: str, db: Session = Depends(get_session), _=Depends(get_admin_user)):
     if not music_repo.delete_music(db, title):
         raise HTTPException(status_code=404, detail="Music not found")
     return {"status": "deleted", "title": title}

@@ -6,8 +6,11 @@ from src.api.core.limiter import limiter
 from src.api.db.session import get_session
 from src.api.db.repositories import user_repo
 from src.api.schemas.auth import RegisterRequest, LoginRequest, RefreshRequest, TokenResponse, UserProfile
-from src.api.services.auth import hash_password, verify_password, create_access_token, create_refresh_token, decode_refresh_token
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from src.api.services.auth import hash_password, verify_password, create_access_token, create_refresh_token, decode_refresh_token, revoke_token
 from src.api.dependencies import get_current_user
+
+bearer = HTTPBearer()
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -61,7 +64,21 @@ def refresh(request: Request, body: RefreshRequest, db: Session = Depends(get_se
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur introuvable")
 
+    revoke_token(body.refresh_token)
+
     return TokenResponse(access_token=create_access_token(user_id), refresh_token=create_refresh_token(user_id))
+
+
+@router.post("/logout", status_code=200)
+def logout(
+    request: Request,
+    body: RefreshRequest,
+    creds: HTTPAuthorizationCredentials = Depends(bearer),
+    _=Depends(get_current_user),
+):
+    revoke_token(creds.credentials)
+    revoke_token(body.refresh_token)
+    return {"message": "Déconnecté avec succès"}
 
 
 @router.get("/me", response_model=UserProfile)
