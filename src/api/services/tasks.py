@@ -62,7 +62,7 @@ def generate_level_task(job_id: str, track_id: str, audio_object: str | None = N
             _publish(job_id, JobState.RUNNING, 20)
             logger.info(f"Job {job_id}: audio downloaded from Jamendo")
 
-            storage_audio = StorageService(bucket_type="audio")
+            storage_audio = StorageService(bucket_type="music")
             storage_audio.upload_file(f"{job_id}/{track_id}.mp3", audio_path)
             job_repo.update_job_progress(db, job_id, 40)
             _publish(job_id, JobState.RUNNING, 40)
