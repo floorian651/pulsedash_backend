@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from urllib.parse import unquote_plus
+
 from src.api.db.models import Music
 
 
@@ -9,7 +11,7 @@ def create_music(
     bpm: float = None,
     duration: float = None,
     file_path: str = None,
-    bucket_name: str = "musics",
+    bucket_name: str = "music",
 ) -> Music:
     """Create a new music"""
     music = Music(
@@ -28,7 +30,17 @@ def create_music(
 
 def get_music(db: Session, title: str) -> Music:
     """Get music by title"""
-    return db.query(Music).filter(Music.title == title).first()
+    music = db.query(Music).filter(Music.title == title).first()
+    if music:
+        return music
+
+    normalized_title = unquote_plus(title)
+    if normalized_title != title:
+        music = db.query(Music).filter(Music.title == normalized_title).first()
+        if music:
+            return music
+
+    return None
 
 
 def get_all_music(db: Session, skip: int = 0, limit: int = 100) -> list:
