@@ -3,22 +3,31 @@ from minio import Minio
 from ..core.config import get_settings
 
 
+def _normalize_endpoint(endpoint: str) -> str:
+    if endpoint.startswith("http://"):
+        return endpoint[len("http://") :]
+    if endpoint.startswith("https://"):
+        return endpoint[len("https://") :]
+    return endpoint
+
+
+def _build_client(settings):
+    access_key = settings.MINIO_ROOT_USER or settings.MINIO_ACCESS_KEY
+    secret_key = settings.MINIO_ROOT_PASSWORD or settings.MINIO_SECRET_KEY
+    endpoint = _normalize_endpoint(settings.MINIO_ENDPOINT)
+
+    return Minio(
+        endpoint,
+        access_key=access_key,
+        secret_key=secret_key,
+        secure=settings.MINIO_SECURE,
+    )
+
+
 def ensure_buckets_exist():
     """Crée les buckets MinIO s'ils n'existent pas"""
     settings = get_settings()
-
-    endpoint = settings.MINIO_ENDPOINT
-    if endpoint.startswith("http://"):
-        endpoint = endpoint[len("http://") :]
-    elif endpoint.startswith("https://"):
-        endpoint = endpoint[len("https://") :]
-
-    client = Minio(
-        endpoint,
-        access_key=settings.MINIO_ACCESS_KEY,
-        secret_key=settings.MINIO_SECRET_KEY,
-        secure=settings.MINIO_SECURE,
-    )
+    client = _build_client(settings)
 
     buckets = [
         settings.MINIO_BUCKET_MUSIC,
@@ -37,20 +46,7 @@ class StorageService:
     def __init__(self, bucket_type: str = "music"):
         # On récupère les settings
         settings = get_settings()
-
-        # Initialisation du client MinIO
-        endpoint = settings.MINIO_ENDPOINT
-        if endpoint.startswith("http://"):
-            endpoint = endpoint[len("http://") :]
-        elif endpoint.startswith("https://"):
-            endpoint = endpoint[len("https://") :]
-
-        self.client = Minio(
-            endpoint,
-            access_key=settings.MINIO_ACCESS_KEY,
-            secret_key=settings.MINIO_SECRET_KEY,
-            secure=settings.MINIO_SECURE,
-        )
+        self.client = _build_client(settings)
 
         # Sélection du bucket selon le besoin (music ou levels)
         if bucket_type == "music":

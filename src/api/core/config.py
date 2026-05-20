@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # Minio
     # ---------------------------------------------------------
     MINIO_ENDPOINT: str
+    MINIO_ROOT_USER: str | None = None
+    MINIO_ROOT_PASSWORD: str | None = None
     MINIO_ACCESS_KEY: str
     MINIO_SECRET_KEY: str
     MINIO_SECURE: bool = False
