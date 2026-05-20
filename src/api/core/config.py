@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     MINIO_BUCKET_MUSIC: str = "music"
     MINIO_BUCKET_LEVELS: str = "levels"
+    MINIO_PUBLIC_ENDPOINT: str | None = None
 
     # ---------------------------------------------------------
     # Redis / Celery
