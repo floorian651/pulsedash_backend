@@ -27,11 +27,8 @@ def get_session() -> Generator[Session, None, None]:
     global engine, SessionLocal
     
     if SessionLocal is None:
-        import os
-        database_url = os.getenv("DATABASE_URL")
-        if not database_url:
-            raise RuntimeError("DATABASE_URL environment variable not set and database engine not initialized.")
-        init_engine(database_url)
+        from src.api.core.config import get_settings
+        init_engine(get_settings().DATABASE_URL)
     
     db = SessionLocal()
     try:
