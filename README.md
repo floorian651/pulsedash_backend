@@ -86,6 +86,12 @@ podman-compose up -d
 
 L'image API utilise la stage `prod` par défaut (pas de deps dev, pas de reload).
 
+### Accès Tailscale / pare-feu
+
+Le bridge Podman de production est figé sur `pulsedash-br` et le subnet du réseau est fixé pour garder des IPs stables. Les règles iptables/UFW utilisées pour exposer PostgreSQL et MinIO via Tailscale sont détaillées dans [IPTABLES_RULES.md](IPTABLES_RULES.md).
+
+Si tu réappliques le stack manuellement hors de ce compose, il faut garder le même subnet et les mêmes IPs avant de recharger `/etc/iptables/rules.v4`.
+
 ### Développement local
 
 ```bash

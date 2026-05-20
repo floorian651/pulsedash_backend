@@ -11,7 +11,8 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - pulsedash-network
+      pulsedash-network:
+        ipv4_address: 10.89.3.2
 
   redis:
     image: docker.io/library/redis:7-alpine
@@ -19,7 +20,8 @@ services:
     volumes:
       - redis_data:/data:Z
     networks:
-      - pulsedash-network
+      pulsedash-network:
+        ipv4_address: 10.89.3.3
 
   minio:
     image: quay.io/minio/minio
@@ -33,7 +35,8 @@ services:
     ports:
       - "9001:9001"
     networks:
-      - pulsedash-network
+      pulsedash-network:
+        ipv4_address: 10.89.3.4
 
   api:
     build:
@@ -53,7 +56,8 @@ services:
       - ./alembic.ini:/app/alembic.ini:Z
       - ./src/api/db/migrations:/app/src/api/db/migrations:Z
     networks:
-      - pulsedash-network
+      pulsedash-network:
+        ipv4_address: 10.89.3.5
 
   celery:
     build:
@@ -69,7 +73,8 @@ services:
       - ./src:/app/src:Z
     command: uv run celery -A src.api.core.celery_app worker --loglevel=info --concurrency=4
     networks:
-      - pulsedash-network
+      pulsedash-network:
+        ipv4_address: 10.89.3.6
 
   tunnel:
     image: docker.io/cloudflare/cloudflared:latest
@@ -80,7 +85,8 @@ services:
     depends_on:
       - api
     networks:
-      - pulsedash-network
+      pulsedash-network:
+        ipv4_address: 10.89.3.7
     environment:
       - CLOUDFLARED_NO_QUIC=true
 
@@ -92,3 +98,9 @@ volumes:
 networks:
   pulsedash-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: pulsedash-br
+    ipam:
+      config:
+        - subnet: 10.89.3.0/24
+          gateway: 10.89.3.1
