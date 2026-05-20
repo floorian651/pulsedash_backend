@@ -15,6 +15,7 @@ class MusicResponse(BaseModel):
     duration: Optional[float]
     bucket_name: str
     file_path: Optional[str]
+    level_path: Optional[str] = None
 
     class Config:
         from_attributes = True

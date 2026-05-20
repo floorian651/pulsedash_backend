@@ -104,6 +104,6 @@ async def import_and_generate(
     # 5. Création du job et lancement de la génération
     job_id = str(uuid.uuid4())
     job_repo.create_job(db, job_id=job_id, user_id=str(current_user.id))
-    generate_level_task.delay(job_id, track_id, audio_object=object_name)
+    generate_level_task.delay(job_id, track_id, audio_object=object_name, music_title=music_title)
 
     return ImportAccepted(job_id=job_id, music_title=music_title, state="pending")

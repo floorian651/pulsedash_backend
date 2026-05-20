@@ -26,7 +26,7 @@ def _publish(job_id: str, state: str, progress: int, error: str | None = None) -
 
 
 @app.task(name="generate_level")
-def generate_level_task(job_id: str, track_id: str, audio_object: str | None = None):
+def generate_level_task(job_id: str, track_id: str, audio_object: str | None = None, music_title: str | None = None):
     """Analyse un fichier audio et stocke le level.json dans MinIO.
 
     Si audio_object est fourni, l'audio est lu depuis le bucket music de MinIO
@@ -85,6 +85,15 @@ def generate_level_task(job_id: str, track_id: str, audio_object: str | None = N
         storage_levels.upload_file(level_object, level_path)
 
         job_repo.set_result_path(db, job_id, level_object)
+
+        if music_title:
+            from src.api.db.repositories import music_repo
+            music = music_repo.get_music(db, music_title)
+            if music:
+                music.level_path = level_object
+                db.commit()
+                logger.info(f"Job {job_id}: level_path set on music '{music_title}'")
+
         job_repo.update_job_progress(db, job_id, 100)
         job_repo.update_job_state(db, job_id, JobState.COMPLETED)
         _publish(job_id, JobState.COMPLETED, 100)

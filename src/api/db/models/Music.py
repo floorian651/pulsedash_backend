@@ -13,6 +13,7 @@ class Music(Base):
     # Stockage MinIO
     bucket_name = Column(String, default="musics")  # Nom du bucket MinIO
     file_path = Column(String, nullable=True)
+    level_path = Column(String, nullable=True)
 
     def __repr__(self):
         return f"<Music(title={self.title}, bucket={self.bucket_name})>"
