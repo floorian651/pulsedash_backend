@@ -56,9 +56,16 @@ class StorageService:
 
     def get_download_url(self, object_name: str, expires_minutes: int = 60):
         """Génère une URL présignée pour Unity"""
-        return self.client.presigned_get_object(
+        url = self.client.presigned_get_object(
             self.bucket_name, object_name, expires=timedelta(minutes=expires_minutes)
         )
+        settings = get_settings()
+        if settings.MINIO_PUBLIC_ENDPOINT:
+            internal = _normalize_endpoint(settings.MINIO_ENDPOINT)
+            public = _normalize_endpoint(settings.MINIO_PUBLIC_ENDPOINT)
+            scheme = "https" if settings.MINIO_SECURE else "http"
+            url = url.replace(f"{scheme}://{internal}", f"{scheme}://{public}", 1)
+        return url
 
     def upload_file(self, object_name: str, file_path: str):
         """Upload vers le bucket sélectionné"""
