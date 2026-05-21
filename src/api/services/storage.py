@@ -1,5 +1,11 @@
+import mimetypes
+import os
 from datetime import timedelta
+
+from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 from minio import Minio
+
 from ..core.config import get_settings
 
 
@@ -66,6 +72,27 @@ class StorageService:
             scheme = "https" if settings.MINIO_SECURE else "http"
             url = url.replace(f"{scheme}://{internal}", f"{scheme}://{public}", 1)
         return url
+
+    def get_download_response(self, object_name: str):
+        """Retourne une réponse de téléchargement servie par l'API."""
+        object_response = self.client.get_object(self.bucket_name, object_name)
+        try:
+            content_type = (
+                object_response.headers.get("content-type")
+                or mimetypes.guess_type(object_name)[0]
+                or "application/octet-stream"
+            )
+            filename = os.path.basename(object_name)
+            headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+            return StreamingResponse(
+                object_response.stream(32 * 1024),
+                media_type=content_type,
+                headers=headers,
+                background=BackgroundTask(object_response.close),
+            )
+        except Exception:
+            object_response.close()
+            raise
 
     def upload_file(self, object_name: str, file_path: str):
         """Upload vers le bucket sélectionné"""

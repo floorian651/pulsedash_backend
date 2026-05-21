@@ -1,6 +1,11 @@
 """Tests CRUD pour /music."""
 
 import io
+from unittest.mock import MagicMock, patch
+
+from fastapi.responses import Response
+
+from src.api.db.repositories import music_repo
 
 MUSIC_FORM = {"title": "Test Song", "artist": "Test Artist", "bpm": 128.0, "duration": 180.0}
 
@@ -65,6 +70,63 @@ def test_get_music_by_title(auth_client):
 
 def test_get_music_not_found(client):
     assert client.get("/api/v1/music/nonexistent").status_code == 404
+
+
+def test_download_music_returns_file_response(client, db):
+    music_repo.create_music(
+        db,
+        title="Test Song",
+        artist="Test Artist",
+        bpm=128.0,
+        duration=180.0,
+        file_path="music_files/Test_Song/my_track.mp3",
+    )
+
+    with patch("src.api.routers.music.StorageService") as MockStorage:
+        instance = MagicMock()
+        instance.get_download_response.return_value = Response(
+            content=b"audio-bytes",
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": 'attachment; filename="my_track.mp3"'},
+        )
+        MockStorage.return_value = instance
+
+        response = client.get("/api/v1/music/Test Song/download")
+
+    assert response.status_code == 200
+    assert response.content == b"audio-bytes"
+    assert response.headers["content-disposition"] == 'attachment; filename="my_track.mp3"'
+    instance.get_download_response.assert_called_once_with("music_files/Test_Song/my_track.mp3")
+
+
+def test_download_level_returns_file_response(client, db):
+    music = music_repo.create_music(
+        db,
+        title="Test Song",
+        artist="Test Artist",
+        bpm=128.0,
+        duration=180.0,
+        file_path="music_files/Test_Song/my_track.mp3",
+    )
+    music.level_path = "levels/Test_Song/level.mp3"
+    db.commit()
+    db.refresh(music)
+
+    with patch("src.api.routers.music.StorageService") as MockStorage:
+        instance = MagicMock()
+        instance.get_download_response.return_value = Response(
+            content=b"level-bytes",
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": 'attachment; filename="level.mp3"'},
+        )
+        MockStorage.return_value = instance
+
+        response = client.get("/api/v1/music/Test Song/level")
+
+    assert response.status_code == 200
+    assert response.content == b"level-bytes"
+    assert response.headers["content-disposition"] == 'attachment; filename="level.mp3"'
+    instance.get_download_response.assert_called_once_with("levels/Test_Song/level.mp3")
 
 
 def test_update_music(auth_client):

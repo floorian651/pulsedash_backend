@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, File, Form, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from ..dependencies import get_current_user, get_admin_user
 from ..services.storage import StorageService
@@ -55,10 +55,9 @@ async def get_music_download_url(title: str, db: Session = Depends(get_session))
         raise HTTPException(status_code=400, detail="Music has no associated file")
     try:
         storage = StorageService(bucket_type="music")
-        download_url = storage.get_download_url(music.file_path, expires_minutes=60)
-        return RedirectResponse(url=download_url, status_code=302)
+        return storage.get_download_response(music.file_path)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate URL: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to prepare download response: {str(e)}")
 
 
 @router.get("/{title}/level")
@@ -70,10 +69,9 @@ async def get_music_level(title: str, db: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Level not generated yet")
     try:
         storage = StorageService(bucket_type="levels")
-        level_url = storage.get_download_url(music.level_path, expires_minutes=60)
-        return RedirectResponse(url=level_url, status_code=302)
+        return storage.get_download_response(music.level_path)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate URL: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to prepare download response: {str(e)}")
 
 
 @router.post("", response_model=MusicResponse)
