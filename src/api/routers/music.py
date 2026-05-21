@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, File, Form, UploadFile
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from ..dependencies import get_current_user, get_admin_user
 from ..services.storage import StorageService
