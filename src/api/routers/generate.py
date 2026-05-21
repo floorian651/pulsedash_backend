@@ -31,6 +31,11 @@ async def generate_level(
 
     job_id = str(uuid.uuid4())
     job_repo.create_job(db, job_id=job_id, user_id=str(current_user.id))
-    generate_level_task.delay(job_id, body.music_title, audio_object=str(music.file_path))
+    generate_level_task.delay(
+        job_id,
+        body.music_title,
+        audio_object=str(music.file_path),
+        music_title=body.music_title,
+    )
     logger.info(f"Job {job_id} queued for music '{body.music_title}'")
     return GenerateAccepted(job_id=job_id, state=JobState.PENDING)

@@ -30,6 +30,7 @@ def test_generate_queues_celery_task_with_audio_object(auth_client, mock_celery,
     mock_celery.delay.assert_called_once()
     _, kwargs = mock_celery.delay.call_args
     assert kwargs.get("audio_object") is not None
+    assert kwargs.get("music_title") == GENERATE_BODY["music_title"]
 
 
 def test_generate_music_not_found_returns_404(auth_client, mock_celery):
