@@ -1,6 +1,10 @@
 # PulseDash Backend
 
-Backend d'un jeu de rythme (style Beat Saber) : analyse audio automatique, génération de niveaux, sessions de jeu et classements.
+Backend d'un projet de jeu de rythme basé sur l'analyse d'une musique afin d'en extraire un niveau de manière automatique.
+
+**Documentation backend complète : [floorian651.github.io/pulsedash](https://floorian651.github.io/pulsedash/)**
+
+---
 
 ## Stack
 
@@ -27,7 +31,7 @@ generate_level_task
   └─ Récupère l'audio depuis MinIO
   └─ Pipeline : BPM, beats, sections, hits
   └─ Stocke level.json dans MinIO (bucket levels)
-  └─ Publie la progression via Redis pub/sub
+  └─ Publie la progression via Redis
 
 WebSocket /ws/jobs/{job_id}
   └─ Souscrit Redis avant lecture DB (pas de race condition)
@@ -43,9 +47,9 @@ WebSocket /ws/jobs/{job_id}
 
 ### Configuration
 
+Copier le .env d'exemple et remplir les variables suivantes selon votre configuration :
 ```bash
 cp .env.example .env
-# Remplir les variables ci-dessous
 ```
 
 | Variable | Description |
@@ -84,13 +88,10 @@ L'image API est construite avec la stage `dev` (deps de dev incluses, `--reload`
 podman-compose up -d
 ```
 
-L'image API utilise la stage `prod` par défaut (pas de deps dev, pas de reload).
-
 ### Accès Tailscale / pare-feu
 
-Le bridge Podman de production est figé sur `pulsedash-br` et le subnet du réseau est fixé pour garder des IPs stables. Les règles iptables/UFW utilisées pour exposer PostgreSQL et MinIO via Tailscale sont détaillées dans [IPTABLES_RULES.md](IPTABLES_RULES.md).
-
-Si tu réappliques le stack manuellement hors de ce compose, il faut garder le même subnet et les mêmes IPs avant de recharger `/etc/iptables/rules.v4`.
+Le bridge Podman de production est fixé sur `pulsedash-br` et le subnet du réseau est fixé pour garder des IPs stables. 
+Les règles iptables/UFW utilisées pour exposer PostgreSQL et MinIO via Tailscale sont détaillées dans la documentation.
 
 ### Développement local
 
@@ -105,48 +106,4 @@ uv run uvicorn src.api.main:app --reload --port 9050
 uv run pytest
 ```
 
-Les tests utilisent SQLite en mémoire et mockent MinIO/Celery — aucun service externe requis.
-
-## Endpoints principaux
-
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `POST` | `/api/v1/auth/register` | Création de compte |
-| `POST` | `/api/v1/auth/login` | Connexion (access + refresh token) |
-| `GET` | `/api/v1/jamendo/search?q=` | Recherche de musiques sur Jamendo |
-| `POST` | `/api/v1/jamendo/import/{track_id}` | Import + génération du niveau |
-| `POST` | `/api/v1/music` | Ajout manuel (multipart, fichier optionnel) |
-| `POST` | `/api/v1/generate` | Régénérer le niveau d'une musique existante |
-| `GET` | `/api/v1/jobs/{job_id}` | État d'un job (progress, result_url, error) |
-| `WS` | `/ws/jobs/{job_id}` | Suivi temps réel via WebSocket |
-| `POST` | `/api/v1/game-sessions` | Démarrer une session de jeu |
-| `POST` | `/api/v1/game-sessions/{id}/end` | Terminer (crée le score automatiquement) |
-| `GET` | `/api/v1/scores/top?music_title=` | Classement par musique |
-| `GET` | `/api/v1/scores/global` | Classement global |
-| `GET` | `/api/v1/profile/me` | Profil + statistiques du joueur |
-
-## Structure du projet
-
-```
-src/
-├── api/
-│   ├── core/          # Config, Celery, rate limiter
-│   ├── db/
-│   │   ├── models/    # SQLAlchemy ORM
-│   │   ├── repositories/
-│   │   └── migrations/
-│   ├── routers/       # Endpoints FastAPI
-│   ├── schemas/       # Pydantic I/O
-│   └── services/      # Jamendo, MinIO, tâches Celery
-└── pipeline/          # Analyse audio (librosa)
-```
-
-## Format du niveau généré
-
-```json
-{
-  "meta": { "bpm": 128.0, "key": "C", "duration": 224.0 },
-  "hits": [{ "time": 0.46, "lane": 2, "type": "tap", "strength": 0.8 }],
-  "sections": [{ "start": 0.0, "end": 32.0, "label": "intro" }]
-}
-```
+Les tests utilisent SQLite en mémoire et mockent MinIO/Celery — aucun service externe requis. La CI tourne automatiquement sur GitHub Actions à chaque push.
