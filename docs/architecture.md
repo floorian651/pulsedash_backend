@@ -271,7 +271,7 @@ src/api/
 
 ### Décisions architecturales notables
 
-**Repository Pattern** — La couche `repositories/` découple la logique métier de SQLAlchemy. Les routers ne manipulent jamais l'ORM directement.
+**Repository Pattern** — La couche `repositories/` découple la logique métier de SQLAlchemy.
 
 **202 Accepted + WebSocket** — La génération de niveaux étant longue, l'API répond immédiatement et pousse les mises à jour de progression via WebSocket/Redis Pub/Sub.
 
