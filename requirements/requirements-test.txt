@@ -9,6 +9,9 @@ SQLAlchemy==2.0.35
 minio==7.2.12
 celery==5.4.0
 redis==5.0.1
+slowapi>=0.1.9
+python-jose[cryptography]>=3.5.0
+bcrypt>=5.0.0
 
 # Test runner
 pytest==8.3.4
