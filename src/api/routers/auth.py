@@ -21,7 +21,7 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     if user_repo.get_user_by_email(db, body.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email déjà utilisé")
 
-    if user_repo.get_user_by_username(db, body.username):
+    if body.username and user_repo.get_user_by_username(db, body.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nom d'utilisateur déjà utilisé")
 
     try:

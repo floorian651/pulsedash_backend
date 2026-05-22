@@ -129,27 +129,27 @@ def test_download_level_returns_file_response(client, db):
     instance.get_download_response.assert_called_once_with("levels/Test_Song/level.mp3")
 
 
-def test_update_music(auth_client):
-    auth_client.post("/api/v1/music", data=MUSIC_FORM)
-    r = auth_client.put("/api/v1/music/Test Song", json={"bpm": 140.0, "artist": "New Artist"})
+def test_update_music(admin_client):
+    admin_client.post("/api/v1/music", data=MUSIC_FORM)
+    r = admin_client.put("/api/v1/music/Test Song", json={"bpm": 140.0, "artist": "New Artist"})
     assert r.status_code == 200
     data = r.json()
     assert data["bpm"] == 140.0
     assert data["artist"] == "New Artist"
 
 
-def test_update_music_not_found(auth_client):
-    assert auth_client.put("/api/v1/music/nonexistent", json={"bpm": 140.0}).status_code == 404
+def test_update_music_not_found(admin_client):
+    assert admin_client.put("/api/v1/music/nonexistent", json={"bpm": 140.0}).status_code == 404
 
 
-def test_delete_music(auth_client):
-    auth_client.post("/api/v1/music", data=MUSIC_FORM)
-    assert auth_client.delete("/api/v1/music/Test Song").status_code == 200
-    assert auth_client.get("/api/v1/music/Test Song").status_code == 404
+def test_delete_music(admin_client):
+    admin_client.post("/api/v1/music", data=MUSIC_FORM)
+    assert admin_client.delete("/api/v1/music/Test Song").status_code == 200
+    assert admin_client.get("/api/v1/music/Test Song").status_code == 404
 
 
-def test_delete_music_not_found(auth_client):
-    assert auth_client.delete("/api/v1/music/nonexistent").status_code == 404
+def test_delete_music_not_found(admin_client):
+    assert admin_client.delete("/api/v1/music/nonexistent").status_code == 404
 
 
 def test_write_requires_auth(client):

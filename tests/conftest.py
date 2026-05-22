@@ -29,16 +29,26 @@ from unittest.mock import MagicMock, patch
 from src.api.core.config import get_settings
 get_settings.cache_clear()
 
-# Patcher DB et MinIO pendant le chargement de main.py (qui appelle create_app())
+# Patcher DB, MinIO et Redis blacklist pendant le chargement de main.py
 _p_engine = patch("src.api.db.session.init_engine")
 _p_minio = patch("src.api.services.storage.ensure_buckets_exist")
+_p_blacklist_check = patch("src.api.services.token_blacklist.is_blacklisted", return_value=False)
+_p_blacklist_add = patch("src.api.services.token_blacklist.blacklist_jti")
 _p_engine.start()
 _p_minio.start()
+_p_blacklist_check.start()
+_p_blacklist_add.start()
 
 from src.api.main import app  # déclenche app = create_app() avec les patches actifs
 
 _p_engine.stop()
 _p_minio.stop()
+_p_blacklist_check.stop()
+_p_blacklist_add.stop()
+
+# Réactiver les patches pour toute la durée des tests
+patch("src.api.services.token_blacklist.is_blacklisted", return_value=False).start()
+patch("src.api.services.token_blacklist.blacklist_jti").start()
 
 import itertools
 
@@ -125,5 +135,22 @@ def auth_client(client):
     )
     assert r.status_code == 201, r.text
     token = r.json()["access_token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return client
+
+
+@pytest.fixture
+def admin_client(client, db):
+    """Client HTTP avec un token JWT d'un utilisateur admin."""
+    from src.api.db.models import User
+    from src.api.services.auth import hash_password as _hash
+
+    user = User(email="admin@example.com", password=_hash("adminpassword123"), is_admin=True)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    from src.api.services.auth import create_access_token
+    token = create_access_token(str(user.id))
     client.headers.update({"Authorization": f"Bearer {token}"})
     return client

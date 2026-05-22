@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from typing import Optional
 
 
@@ -16,6 +16,11 @@ class MusicResponse(BaseModel):
     bucket_name: str
     file_path: Optional[str]
     level_path: Optional[str] = None
+
+    @computed_field
+    @property
+    def has_level(self) -> bool:
+        return self.level_path is not None
 
     class Config:
         from_attributes = True
